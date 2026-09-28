@@ -118,3 +118,9 @@ def test_nets_on_air_needs_a_callsign_once():
     assert call("omiss_set_callsign", {"callsign": "ki7mt"}) == {"callsign": "KI7MT", "saved": True}
     r = call("omiss_nets_on_air")
     assert r["nets"] and all("OMISS" in n["name"] for n in r["nets"])
+
+
+def test_errors_carry_as_of():
+    for r in (call("omiss_member_lookup", {}), call("omiss_checkin_history", {"band": "6m"}),
+              call("omiss_nets_on_air")):
+        assert "error" in r and r["as_of_utc"].endswith("Z")

@@ -164,6 +164,12 @@ HOLIDAY_FOOTNOTE = 1  # "And Monday if it is a Legal Holiday, plus ..." (the hol
 LOOKAHEAD_DAYS = 15
 
 
+def season(net: dict[str, Any]) -> dict[str, Any]:
+    """{'season': 'winter'} for a net that cites the winter-schedule footnotes,
+    so weekdays_utc isn't read as year-round; {} otherwise."""
+    return {"season": "winter"} if set(net.get("footnotes", [])) & WINTER_FOOTNOTES else {}
+
+
 def next_run(net: dict[str, Any], holidays: set[str], now: datetime) -> dict[str, Any]:
     """{'next_utc': ..., 'next_is_holiday': bool} or {'next_utc_note': why not}.
 
@@ -329,7 +335,7 @@ class OmissSource:
         value, info = self._page("schedule", "index.php", {}, pages.net_schedule)
         now = self._now()
         holidays = {h["date"] for h in value.get("holidays", [])}
-        nets = [dict(n, **next_run(n, holidays, now)) for n in value["nets"]]
+        nets = [dict(n, **season(n), **next_run(n, holidays, now)) for n in value["nets"]]
         return {"source": SOURCE, **value, "nets": nets, **info}
 
     def member_lookup(self, callsign: str | None = None, om_number_: str | int | None = None) -> dict[str, Any]:

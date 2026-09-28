@@ -169,3 +169,9 @@ def test_a_net_already_started_today_is_next_tomorrow():
 def test_unreadable_days_get_a_note_not_a_guess():
     net = {"band": "20m", "time_utc": "18:30", "days": ["Every other full moon"]}
     assert "next_utc_note" in next_run(net, set(), datetime(2026, 9, 28, tzinfo=timezone.utc))
+
+
+def test_winter_nets_carry_a_season():
+    b = _schedule_at(datetime(2026, 9, 28, 23, 19, tzinfo=timezone.utc))["by_band"]
+    assert b["160m"]["season"] == "winter" and b["80m Late"]["season"] == "winter"
+    assert "season" not in b["20m"]

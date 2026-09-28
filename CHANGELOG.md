@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-09-28)
 
 - Tools for OMISS's public pages: the net schedule and holidays, member lookup, check-in history,
   one past net's check-ins, the Statehood schedule, officers, awards, award rules, award recipients

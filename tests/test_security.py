@@ -49,10 +49,11 @@ def test_no_subprocess():
 
 
 def test_all_urls_https():
-    """Guarantee #7: HTTPS only for external calls."""
+    """Guarantee #7: HTTPS only for external calls. Every file under src/, as the
+    release gate checks it (the bundled sample pages included)."""
     http_url = re.compile(r'http://(?!localhost|127\.0\.0\.1|::1)')
-    for py_file in _py_files():
-        content = py_file.read_text()
+    for py_file in (p for p in SRC_DIR.rglob("*") if p.is_file() and "__pycache__" not in p.parts):
+        content = py_file.read_text(encoding="utf-8", errors="replace")
         matches = http_url.findall(content)
         assert not matches, f"Non-HTTPS URL in {py_file.name}: {matches}"
 

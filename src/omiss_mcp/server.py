@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import sys
 import urllib.parse
+from datetime import datetime, timezone
 from importlib.resources import files
 from typing import Any
 
@@ -128,11 +129,15 @@ def get_version_info() -> dict[str, Any]:
 @mcp.tool()
 def omiss_net_schedule() -> dict[str, Any]:
     """Get the OMISS net schedule: every net's band, UTC time, frequency and window,
-    days, holiday time and band coordinator, the schedule's footnotes (holidays,
-    winter schedule), and the federal holiday dates the holiday schedule follows.
+    days, holiday time and band coordinator, and the next time it runs; the
+    schedule's footnotes (holidays, winter schedule); and the federal holiday
+    dates the holiday schedule follows. Days and times are UTC, so an evening
+    net in the Americas falls on the previous local day; use next_utc and
+    as_of_utc to work out "today" in the user's time zone.
 
     Returns:
-        nets, footnotes (by number, as the nets' footnotes list them), notes, holidays.
+        as_of_utc; nets with weekdays_utc, seasonal_utc, next_utc (or next_utc_note
+        when it can't be worked out, e.g. winter-only nets); footnotes; notes; holidays.
     """
     return _run("net_schedule")
 
@@ -142,8 +147,8 @@ def omiss_nets_on_air() -> dict[str, Any]:
     """List OMISS nets on the air now, from NetLogger.
 
     Returns:
-        Nets with server, name, frequency, band, mode, net control, when opened and
-        how many are monitoring.
+        as_of_utc, and nets with server, name, frequency, band, mode, net control,
+        when opened and how many are monitoring.
     """
     global _netlogger
     try:
@@ -157,7 +162,8 @@ def omiss_nets_on_air() -> dict[str, Any]:
                                              limiter=RateLimiter(NETLOGGER_LIMITS), cache=Cache())
             else:
                 _netlogger = NetLoggerSource(callsign, "omiss-mcp", __version__)
-        return _netlogger.active_nets(name_like="OMISS")
+        result = _netlogger.active_nets(name_like="OMISS")
+        return {**result, "as_of_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
     except NetLoggerError as e:
         return {"error": str(e)}
     except Exception:

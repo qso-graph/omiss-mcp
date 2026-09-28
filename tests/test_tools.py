@@ -58,7 +58,7 @@ def test_tool_list():
 
 def test_version_info():
     r = call("get_version_info")
-    assert r["service_name"] == "omiss-mcp" and r["contract_version"] == "0.1"
+    assert r["service_name"] == "omiss-mcp" and r["contract_version"] == "0.2"
 
 
 def test_schedule():

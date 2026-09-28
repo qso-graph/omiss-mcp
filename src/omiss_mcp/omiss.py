@@ -23,7 +23,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable
 
 from netlogger_mcp.limiter import Cache, RateLimiter, SharedRateLimiter
@@ -153,6 +153,53 @@ def user_agent(program_id: str | None = None, program_version: str | None = None
 
 
 # ---------------------------------------------------------------------------
+# When a scheduled net next runs
+# ---------------------------------------------------------------------------
+
+# Footnotes that mark a net as winter-schedule only. The page says when the
+# winter schedule runs but not exactly what it changes, so these nets get no
+# next time rather than a guess.
+WINTER_FOOTNOTES = {2, 3}
+HOLIDAY_FOOTNOTE = 1  # "And Monday if it is a Legal Holiday, plus ..." (the holiday table's dates)
+LOOKAHEAD_DAYS = 15
+
+
+def next_run(net: dict[str, Any], holidays: set[str], now: datetime) -> dict[str, Any]:
+    """{'next_utc': ..., 'next_is_holiday': bool} or {'next_utc_note': why not}.
+
+    Regular days are the net's UTC weekdays (and seasonal extras). A net citing
+    footnote 1 also runs on the page's holiday dates, at its holiday time if it
+    has one.
+    """
+    notes = set(net.get("footnotes", []))
+    if notes & WINTER_FOOTNOTES:
+        return {"next_utc_note": "winter-schedule net; see footnotes " +
+                ", ".join(str(n) for n in sorted(notes & WINTER_FOOTNOTES))}
+    weekdays = net.get("weekdays_utc")
+    if weekdays is None:
+        return {"next_utc_note": "the net's days couldn't be read; see days"}
+    seasonal = net.get("seasonal_utc", [])
+
+    def at(day: date, hhmm: str) -> datetime:
+        h, m = (int(x) for x in hhmm.split(":"))
+        return datetime(day.year, day.month, day.day, h, m, tzinfo=timezone.utc)
+
+    start = now.astimezone(timezone.utc)
+    for offset in range(LOOKAHEAD_DAYS):
+        day = start.date() + timedelta(days=offset)
+        name = pages.WEEKDAYS[day.weekday()]
+        holiday = HOLIDAY_FOOTNOTE in notes and day.isoformat() in holidays
+        regular = name in weekdays or any(
+            name in s["weekdays"] and day.month in s["months"] for s in seasonal)
+        if not (holiday or regular):
+            continue
+        when = at(day, net.get("holiday_time_utc") or net["time_utc"]) if holiday else at(day, net["time_utc"])
+        if when > start:
+            return {"next_utc": when.strftime("%Y-%m-%dT%H:%M:%SZ"), "next_is_holiday": holiday}
+    return {"next_utc_note": f"doesn't run in the next {LOOKAHEAD_DAYS} days"}
+
+
+# ---------------------------------------------------------------------------
 # HTTP
 # ---------------------------------------------------------------------------
 
@@ -188,6 +235,7 @@ class OmissSource:
         limiter: RateLimiter | SharedRateLimiter | None = None,
         cache: Cache | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
     ) -> None:
         """``program_id`` and ``program_version``: the app built on this library,
         as in ADIF's PROGRAMID and PROGRAMVERSION (e.g. "MyLogger", "1.0");
@@ -197,6 +245,7 @@ class OmissSource:
         self._limiter = limiter or SharedRateLimiter(LIMITS, limits_file(), window=SPACING)
         self._cache = cache or Cache()
         self._sleep = sleep
+        self._now = now
         self._inflight = threading.Lock()  # one request at a time
 
     # ------------------------------------------------------------------
@@ -214,6 +263,12 @@ class OmissSource:
             waited += wait
 
     def _page(self, kind: str, path: str, params: dict[str, str], build: Callable[[str], Any]) -> tuple[Any, dict[str, Any]]:
+        """Fetch a page (or use the cache); the value and its freshness, with the
+        time of the answer (as_of_utc)."""
+        value, info = self._fetch_page(kind, path, params, build)
+        return value, {"as_of_utc": self._now().strftime("%Y-%m-%dT%H:%M:%SZ"), **info}
+
+    def _fetch_page(self, kind: str, path: str, params: dict[str, str], build: Callable[[str], Any]) -> tuple[Any, dict[str, Any]]:
         """Fetch a page, parse it with ``build``, cache the result."""
         key = kind + ":" + path + "?" + urllib.parse.urlencode(sorted(params.items()))
         hit = self._cache.get(key)
@@ -269,9 +324,13 @@ class OmissSource:
     # ------------------------------------------------------------------
 
     def net_schedule(self) -> dict[str, Any]:
-        """The OMISS nets: band, time, frequency, days, coordinator; and holidays."""
+        """The OMISS nets: band, time, frequency, days, coordinator, and the next
+        time each runs; and holidays."""
         value, info = self._page("schedule", "index.php", {}, pages.net_schedule)
-        return {"source": SOURCE, **value, **info}
+        now = self._now()
+        holidays = {h["date"] for h in value.get("holidays", [])}
+        nets = [dict(n, **next_run(n, holidays, now)) for n in value["nets"]]
+        return {"source": SOURCE, **value, "nets": nets, **info}
 
     def member_lookup(self, callsign: str | None = None, om_number_: str | int | None = None) -> dict[str, Any]:
         """One member, by callsign or OM number (not both)."""
@@ -334,7 +393,7 @@ class OmissSource:
     def statehood_schedule(self, today: date | None = None) -> dict[str, Any]:
         """The 40m net dates and their free-call states, and the next one."""
         rows, info = self._page("statehood", "statehoodSchedule.php", {}, pages.statehood_schedule)
-        today = today or datetime.now(timezone.utc).date()
+        today = today or self._now().date()
         upcoming = [r for r in rows if r["date"] >= today.isoformat()]
         return {"source": SOURCE, "next": upcoming[0] if upcoming else None, "schedule": rows, **info}
 

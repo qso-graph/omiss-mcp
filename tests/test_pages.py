@@ -1,0 +1,130 @@
+"""The page parsers, on the bundled synthetic samples (omiss.net's markup)."""
+
+from __future__ import annotations
+
+from importlib.resources import files
+
+import pytest
+
+from omiss_mcp import pages
+from omiss_mcp.html import PageChanged, tables
+
+
+def sample(name: str) -> str:
+    return files("omiss_mcp.samples").joinpath(name).read_text(encoding="utf-8")
+
+
+def test_net_schedule():
+    s = pages.net_schedule(sample("index.html"))
+    first = s["nets"][0]
+    assert first == {
+        "band": "10m", "time_utc": "18:00", "frequency_mhz": "28.525", "frequency_window": "28.500-28.695",
+        "days": ["Sat & Sun", "Wed: April-June"], "footnotes": [1],
+        "coordinator": {"callsign": "W1XAA", "name": "ALICE", "om_number": 1001},
+    }
+    twelve = s["nets"][1]
+    assert twelve["holiday_time_utc"] == "16:30"
+    assert twelve["days"] == ["Sat, Sun", "Wed: July-September"]  # a footnote mark with no space
+    assert s["nets"][3]["footnotes"] == [1, 2, 3]
+    assert "footnotes" not in s["nets"][2]  # "Daily", no marks
+    assert set(s["footnotes"]) == {"1", "2", "3"}
+    assert s["notes"] == ["Days and times are in UTC. Nets that are Friday night local are displayed as Sat UTC."]
+    assert s["holidays"][1] == {
+        "date": "2026-02-16", "name": "Washington's Birthday (observed)",
+        "note": "Washington's Birthday is also Presidents Day (observed)",
+    }
+
+
+def test_members_and_no_match():
+    found = pages.members(sample("searchResults.html"))
+    assert [m["callsign"] for m in found] == ["W1OMS", "W1OMSX"]
+    assert found[0]["first_responder"] == ["Firefighter"]
+    assert found[0]["last_checkin"] == "2026-09-26T19:30:02Z"
+    assert found[1]["silent_key"] is True and found[1]["last_checkin"] == "2019-03-07T02:05:00Z"
+    assert pages.members(sample("searchResults_none.html")) == []
+
+
+def test_checkin_history():
+    h = pages.checkin_history(sample("listCheckinHistory.html"))
+    assert h["matches"] == 3 and h["site_limit"] == 100
+    assert h["nets"][1] == {"net_id": 30000, "name": "OMISS 40m SSB Late Net",
+                            "time": "2026-09-26T04:55:23Z", "checkin_count": 1}
+    assert h["nets"][2]["time"] == "2026-09-05T03:56:35Z"
+
+
+def test_net_checkins():
+    n = pages.net_checkins(sample("displayCheckinHistory.html"))
+    assert n["net_control"] == "W3XCC" and n["relays"] == ["W2XBB", "W4XDD"]
+    assert n["archived_by"] == "W3XCC" and n["closed_at_utc"] == "19:28"
+    assert n["checkin_count"] == 3 and n["log_notes"] == ["NET CLOSED:19:28"]
+    assert n["checkins"][1]["om_number"] == 999
+    assert "om_number" not in n["checkins"][2]  # a visitor, not a member
+    assert "[email removed]" in n["notes"] and "@" not in n["notes"]
+    assert pages.net_checkins(sample("displayCheckinHistory_none.html")) is None
+
+
+def test_statehood():
+    rows = pages.statehood_schedule(sample("statehoodSchedule.html"))
+    assert rows[0] == {"date": "2025-03-13", "free_call_states": ["Delaware"]}
+    assert rows[2] == {"date": "2026-01-01", "free_call_states": ["Washington", "Idaho"]}
+
+
+def test_officers():
+    by = {s["section"]: s for s in pages.officers(sample("vipListing.html"))}
+    assert by["Officers of the Society"]["people"][0] == {
+        "role": "President", "callsign": "W1XAA", "name": "ALICE", "om_number": 1001}
+    assert by["Band Coordinators"]["people"][1]["role"] == "40m-Early-Band Coord"
+    assert by["Ethics Committee"]["people"][0]["note"] == "Chair"
+    assert by["Appointees"]["people"] == [
+        {"role": "Awards Manager", "callsign": "W3XCC", "name": "CAROL", "om_number": 1003},
+        {"role": "Chaplain", "vacant": True},
+    ]
+    assert by["Charter Members"]["text"] == ["OM #01-110"]
+    assert by["Past Presidents"]["people"][0] == {
+        "term": "1982-1983", "callsign": "K1XFF", "name": "FRANK", "om_number": 16, "silent_key": True}
+    assert by["OM Of The Year"]["people"][1] == {"year": 2015, "callsign": "K7XII", "name": "IVY", "om_number": 1007}
+
+
+def test_awards_and_rules():
+    assert [a["award_id"] for a in pages.awards(sample("awardRecipients.html"))] == ["100GOLD", "ALPHABETSOUP", "5x325"]
+    r = pages.award_rules(sample("awardRules.html"))
+    gold = r["awards"][0]
+    assert gold["award_id"] == "100GOLD" and gold["summary"].startswith("Work 100 OM members")
+    assert gold["rules"]["Contacts Start Date"] == "You may use contacts starting from January 1, 2004."
+    assert "Application and Submission" not in gold["rules"]  # printed with a postal address
+    assert gold["how_to_apply"]
+    assert "how_to_apply" not in r["awards"][1]
+
+
+def test_award_recipients():
+    r = pages.award_recipients(sample("GenAwardReport.html"))
+    assert r["name"] == "Alphabet Soup"
+    assert r["recipients"][0] == {"certificate": "1", "callsign": "K1XFF", "om_number": 16,
+                                  "issued": "2006-07-20", "silent_key": True}
+    assert r["recipients"][2]["issued"] == "2026-08-01" and r["recipients"][2]["notes"] == "Electronic"
+
+
+def test_statistics():
+    s = pages.net_statistics(sample("statistics.html"))
+    assert s["nets_total"] == 1000 and s["nets_per_band"]["40m Late"] == 100
+    assert s["last_net_per_band"]["80m Late"] == "2026-04-05T05:45:12Z"
+    assert s["leaderboards"]["king_of_the_hill_total_checkins_current_month"]["entries"][0] == {
+        "rank": 1, "callsign": "W1OMS", "count": 42}
+    assert s["leaderboards"]["ncs_total_nets_last_90_days"]["entries"][1]["callsign"] == "W4XDD"
+    assert s["last_checkin_by_state"]["CT"]["160m"] == {"callsign": "W1OMS", "time": "2026-09-10T19:30:02Z"}
+    assert s["last_checkin_by_state"]["PA"] == {"10m": {"callsign": "W3XCC", "time": "2026-08-16T18:44:20Z"}}
+
+
+@pytest.mark.parametrize("parser", [
+    pages.net_schedule, pages.members, pages.checkin_history, pages.net_checkins,
+    pages.statehood_schedule, pages.officers, pages.awards, pages.award_rules,
+    pages.award_recipients, pages.net_statistics,
+])
+def test_a_changed_page_is_reported_not_guessed(parser):
+    with pytest.raises(PageChanged):
+        parser("<html><body><h1>Down for maintenance</h1></body></html>")
+
+
+def test_nested_tables_are_separate():
+    t = tables("<table><tr><td>a</td><td><table><tr><td>b</td></tr></table></td></tr></table>")
+    assert t == [[["b"]], [["a", ""]]]

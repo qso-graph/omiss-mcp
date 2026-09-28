@@ -1,0 +1,304 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/qso-graph/omiss-mcp/blob/main/src/omiss_mcp/schema/contract.schema.json",
+  "title": "omiss-mcp records",
+  "description": "The records omiss-mcp's tools return, contract version 0.1. Check-in fields share netlogger-mcp's names. Every tool result also carries source, cached, age_seconds and stale, or is {error}.",
+  "$defs": {
+    "callsign": {"type": "string", "pattern": "^[A-Z0-9/]{3,20}$"},
+    "om_number": {"type": "integer", "minimum": 0},
+    "utc_time": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "freshness": {
+      "type": "object",
+      "properties": {
+        "source": {"const": "omiss"},
+        "cached": {"type": "boolean"},
+        "age_seconds": {"type": "integer", "minimum": 0},
+        "stale": {"type": "boolean"},
+        "note": {"type": "string"}
+      },
+      "required": ["source", "cached", "age_seconds", "stale"]
+    },
+    "person": {
+      "type": "object",
+      "properties": {
+        "callsign": {"$ref": "#/$defs/callsign"},
+        "name": {"type": "string"},
+        "om_number": {"$ref": "#/$defs/om_number"}
+      },
+      "additionalProperties": false
+    },
+    "scheduled_net": {
+      "type": "object",
+      "properties": {
+        "band": {"type": "string"},
+        "time_utc": {"type": "string", "pattern": "^\\d{2}:\\d{2}$"},
+        "frequency_mhz": {"type": "string"},
+        "frequency_window": {"type": "string"},
+        "holiday_time_utc": {"type": "string", "pattern": "^\\d{2}:\\d{2}$"},
+        "days": {"type": "array", "items": {"type": "string"}},
+        "footnotes": {"type": "array", "items": {"type": "integer"}},
+        "coordinator": {"$ref": "#/$defs/person"}
+      },
+      "required": ["band", "time_utc", "frequency_mhz"],
+      "additionalProperties": false
+    },
+    "member": {
+      "type": "object",
+      "properties": {
+        "om_number": {"$ref": "#/$defs/om_number"},
+        "callsign": {"$ref": "#/$defs/callsign"},
+        "first_name": {"type": "string"},
+        "status": {"type": "string"},
+        "status_meaning": {"type": "string"},
+        "silent_key": {"const": true},
+        "grid": {"type": "string"},
+        "state": {"type": "string"},
+        "county": {"type": "string"},
+        "qsl_bureau_envelopes": {"type": "integer"},
+        "military": {"type": "string"},
+        "first_responder": {"type": "array", "items": {"type": "string"}},
+        "last_checkin": {"$ref": "#/$defs/utc_time"}
+      },
+      "required": ["om_number", "callsign"],
+      "additionalProperties": false
+    },
+    "past_net": {
+      "type": "object",
+      "properties": {
+        "net_id": {"type": "integer"},
+        "name": {"type": "string"},
+        "time": {"$ref": "#/$defs/utc_time"},
+        "checkin_count": {"type": "integer"}
+      },
+      "required": ["net_id", "name", "checkin_count"],
+      "additionalProperties": false
+    },
+    "checkin": {
+      "type": "object",
+      "properties": {
+        "serial": {"type": "integer"},
+        "callsign": {"$ref": "#/$defs/callsign"},
+        "name": {"type": "string"},
+        "city": {"type": "string"},
+        "state": {"type": "string"},
+        "county": {"type": "string"},
+        "grid": {"type": "string"},
+        "status": {"type": "string"},
+        "qsl_info": {"type": "string"},
+        "member_id": {"type": "string"},
+        "om_number": {"$ref": "#/$defs/om_number"}
+      },
+      "required": ["callsign"],
+      "additionalProperties": false
+    },
+    "vip": {
+      "type": "object",
+      "properties": {
+        "role": {"type": "string"},
+        "term": {"type": "string"},
+        "year": {"type": "integer"},
+        "callsign": {"$ref": "#/$defs/callsign"},
+        "name": {"type": "string"},
+        "om_number": {"$ref": "#/$defs/om_number"},
+        "silent_key": {"const": true},
+        "vacant": {"const": true},
+        "note": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "award": {
+      "type": "object",
+      "properties": {
+        "award_id": {"type": "string", "pattern": "^[A-Za-z0-9]{1,32}$"},
+        "name": {"type": "string"},
+        "summary": {"type": "string"}
+      },
+      "required": ["award_id", "name"],
+      "additionalProperties": false
+    },
+    "recipient": {
+      "type": "object",
+      "properties": {
+        "certificate": {"type": "string"},
+        "callsign": {"$ref": "#/$defs/callsign"},
+        "om_number": {"$ref": "#/$defs/om_number"},
+        "issued": {"type": "string"},
+        "band_info": {"type": "string"},
+        "endorsements": {"type": "string"},
+        "notes": {"type": "string"},
+        "silent_key": {"const": true}
+      },
+      "required": ["callsign"],
+      "additionalProperties": false
+    },
+    "leaderboard": {
+      "type": "object",
+      "properties": {
+        "title": {"type": "string"},
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "rank": {"type": "integer"},
+              "callsign": {"$ref": "#/$defs/callsign"},
+              "count": {"type": "integer"}
+            },
+            "required": ["callsign", "count"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["title", "entries"]
+    },
+
+    "net_schedule": {
+      "allOf": [{"$ref": "#/$defs/freshness"}],
+      "properties": {
+        "nets": {"type": "array", "items": {"$ref": "#/$defs/scheduled_net"}},
+        "footnotes": {"type": "object", "additionalProperties": {"type": "string"}},
+        "notes": {"type": "array", "items": {"type": "string"}},
+        "holidays": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {"date": {"$ref": "#/$defs/date"}, "name": {"type": "string"}, "note": {"type": "string"}},
+            "required": ["date", "name"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["nets", "holidays"]
+    },
+    "member_lookup": {
+      "allOf": [{"$ref": "#/$defs/freshness"}],
+      "properties": {
+        "found": {"type": "boolean"},
+        "members": {"type": "array", "items": {"$ref": "#/$defs/member"}},
+        "message": {"type": "string"}
+      },
+      "required": ["found", "members"]
+    },
+    "checkin_history": {
+      "allOf": [{"$ref": "#/$defs/freshness"}],
+      "properties": {
+        "filters": {"type": "object"},
+        "matches": {"type": "integer"},
+        "showing": {"type": "integer"},
+        "site_limit": {"type": ["integer", "null"]},
+        "nets": {"type": "array", "items": {"$ref": "#/$defs/past_net"}}
+      },
+      "required": ["matches", "showing", "nets"]
+    },
+    "net_checkins": {
+      "allOf": [{"$ref": "#/$defs/freshness"}],
+      "properties": {
+        "net_id": {"type": "integer"},
+        "found": {"type": "boolean"},
+        "archived_by": {"$ref": "#/$defs/callsign"},
+        "archived": {"$ref": "#/$defs/utc_time"},
+        "name": {"type": "string"},
+        "net_control": {"type": "string"},
+        "relays": {"type": "array", "items": {"type": "string"}},
+        "frequency": {"type": "string"},
+        "closed_at_utc": {"type": "string"},
+        "notes": {"type": "string"},
+        "log_notes": {"type": "array", "items": {"type": "string"}},
+        "checkin_count": {"type": "integer"},
+        "checkins": {"type": "array", "items": {"$ref": "#/$defs/checkin"}},
+        "message": {"type": "string"}
+      },
+      "required": ["net_id", "found"]
+    },
+    "statehood_schedule": {
+      "allOf": [{"$ref": "#/$defs/freshness"}],
+      "properties": {
+        "next": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/statehood_date"}]},
+        "schedule": {"type": "array", "items": {"$ref": "#/$defs/statehood_date"}}
+      },
+      "required": ["schedule"]
+    },
+    "statehood_date": {
+      "type": "object",
+      "properties": {
+        "date": {"$ref": "#/$defs/date"},
+        "free_call_states": {"type": "array", "items": {"type": "string"}}
+      },
+      "required": ["date", "free_call_states"],
+      "additionalProperties": false
+    },
+    "officers": {
+      "allOf": [{"$ref": "#/$defs/freshness"}],
+      "properties": {
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "section": {"type": "string"},
+              "people": {"type": "array", "items": {"$ref": "#/$defs/vip"}},
+              "text": {"type": "array", "items": {"type": "string"}}
+            },
+            "required": ["section"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["sections"]
+    },
+    "awards": {
+      "allOf": [{"$ref": "#/$defs/freshness"}],
+      "properties": {
+        "total": {"type": "integer"},
+        "awards": {"type": "array", "items": {"$ref": "#/$defs/award"}}
+      },
+      "required": ["awards"]
+    },
+    "award_rules": {
+      "allOf": [{"$ref": "#/$defs/freshness"}],
+      "properties": {
+        "award_id": {"type": "string"},
+        "name": {"type": "string"},
+        "summary": {"type": "string"},
+        "rules": {"type": "object", "additionalProperties": {"type": "string"}},
+        "how_to_apply": {"type": "string"},
+        "rules_url": {"type": "string", "format": "uri"},
+        "note": {"type": ["string", "null"]},
+        "total": {"type": "integer"},
+        "awards": {"type": "array", "items": {"$ref": "#/$defs/award"}}
+      }
+    },
+    "award_recipients": {
+      "allOf": [{"$ref": "#/$defs/freshness"}],
+      "properties": {
+        "award_id": {"type": "string"},
+        "name": {"type": ["string", "null"]},
+        "total": {"type": "integer"},
+        "returned": {"type": "integer"},
+        "recipients": {"type": "array", "items": {"$ref": "#/$defs/recipient"}}
+      },
+      "required": ["award_id", "total", "recipients"]
+    },
+    "net_statistics": {
+      "allOf": [{"$ref": "#/$defs/freshness"}],
+      "properties": {
+        "period_start": {"$ref": "#/$defs/utc_time"},
+        "period_end": {"$ref": "#/$defs/utc_time"},
+        "nets_total": {"type": "integer"},
+        "nets_per_band": {"type": "object", "additionalProperties": {"type": ["integer", "null"]}},
+        "last_net_per_band": {"type": "object", "additionalProperties": {"$ref": "#/$defs/utc_time"}},
+        "leaderboards": {"type": "object", "additionalProperties": {"$ref": "#/$defs/leaderboard"}},
+        "state": {"type": "string"},
+        "last_checkin_by_band": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {"callsign": {"$ref": "#/$defs/callsign"}, "time": {"$ref": "#/$defs/utc_time"}}
+          }
+        }
+      },
+      "required": ["nets_per_band", "last_net_per_band", "leaderboards"]
+    }
+  }
+}

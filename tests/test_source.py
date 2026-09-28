@@ -118,3 +118,54 @@ def test_live_schedule_and_officers():
     assert len(s["nets"]) >= 5 and all(n["time_utc"] for n in s["nets"])
     o = source.officers()
     assert any(sec["section"] == "Officers of the Society" for sec in o["sections"])
+
+
+# ---------------------------------------------------------------------------
+# as_of_utc and next_utc (#4, #5)
+# ---------------------------------------------------------------------------
+
+from datetime import datetime, timezone  # noqa: E402
+
+from omiss_mcp.omiss import next_run  # noqa: E402
+
+
+def _schedule_at(now: datetime) -> dict:
+    body = files("omiss_mcp.samples").joinpath("index.html").read_bytes()
+    source = OmissSource(fetch=lambda url: (200, body, None), limiter=RateLimiter(LIMITS, window=0.0),
+                         now=lambda: now)
+    r = source.net_schedule()
+    return r | {"by_band": {n["band"]: n for n in r["nets"]}}
+
+
+def test_every_response_has_as_of():
+    r = _schedule_at(datetime(2026, 9, 28, 23, 19, 5, tzinfo=timezone.utc))
+    assert r["as_of_utc"] == "2026-09-28T23:19:05Z"
+
+
+def test_next_utc_on_a_monday_evening():
+    # Monday 23:19 UTC: the daily 20m net ran at 18:30; the weekend nets are Saturday.
+    b = _schedule_at(datetime(2026, 9, 28, 23, 19, tzinfo=timezone.utc))["by_band"]
+    assert b["20m"]["next_utc"] == "2026-09-29T18:30:00Z" and b["20m"]["next_is_holiday"] is False
+    assert b["10m"]["next_utc"] == "2026-10-03T18:00:00Z"
+    assert b["12m"]["next_utc"] == "2026-09-30T20:30:00Z"  # Wednesdays July-September
+    assert "next_utc" not in b["80m Late"] and "winter" in b["80m Late"]["next_utc_note"]
+    assert "next_utc" not in b["160m"]
+
+
+def test_next_utc_on_a_holiday():
+    # Christmas 2026 is a Friday and on the page's holiday list. Nets citing
+    # footnote 1 run that day, at their holiday time if they have one.
+    b = _schedule_at(datetime(2026, 12, 24, 22, 0, tzinfo=timezone.utc))["by_band"]
+    assert b["10m"]["next_utc"] == "2026-12-25T18:00:00Z" and b["10m"]["next_is_holiday"] is True
+    assert b["12m"]["next_utc"] == "2026-12-25T16:30:00Z"  # its holiday time
+    assert b["20m"]["next_utc"] == "2026-12-25T18:30:00Z" and b["20m"]["next_is_holiday"] is False
+
+
+def test_a_net_already_started_today_is_next_tomorrow():
+    b = _schedule_at(datetime(2026, 9, 29, 18, 30, tzinfo=timezone.utc))["by_band"]
+    assert b["20m"]["next_utc"] == "2026-09-30T18:30:00Z"
+
+
+def test_unreadable_days_get_a_note_not_a_guess():
+    net = {"band": "20m", "time_utc": "18:30", "days": ["Every other full moon"]}
+    assert "next_utc_note" in next_run(net, set(), datetime(2026, 9, 28, tzinfo=timezone.utc))

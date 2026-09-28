@@ -86,6 +86,71 @@ _FOOTNOTE_REF_RE = re.compile(r"\s*\[fn:([\d,\s]+)\]")
 _HOLIDAY_RE = re.compile(r"^([A-Z][a-z]+ \d{1,2}, \d{4})\s*\([A-Za-z]+\):\s*(.+)$")
 
 
+WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+_WEEKDAY_RE = re.compile(r"\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\b", re.I)
+_MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August",
+           "September", "October", "November", "December")
+_MONTH_RANGE_RE = re.compile(r"^(.*?):\s*([A-Za-z]+)\s*-\s*([A-Za-z]+)$")
+_WINDOW_RANGE_RE = re.compile(r"^([\d.]+)\s*-\s*([\d.]+)$")
+_WINDOW_OFFSET_RE = re.compile(r"^\+/-\s*([\d.]+)\s*kHz$", re.I)
+
+
+def _month(name: str) -> int | None:
+    name = name.strip().casefold()
+    for i, m in enumerate(_MONTHS, 1):
+        if m.casefold() == name or m[:3].casefold() == name:
+            return i
+    return None
+
+
+def _weekdays(text: str) -> list[str] | None:
+    """'Sat & Sun' -> ['Sat', 'Sun']; 'Daily' -> all seven; None if unreadable."""
+    if text.strip().casefold() == "daily":
+        return list(WEEKDAYS)
+    found = [d.title()[:3] for d in _WEEKDAY_RE.findall(text)]
+    rest = _WEEKDAY_RE.sub("", text)
+    if not found or re.sub(r"[\s&,]|and", "", rest, flags=re.I):
+        return None
+    return [d for d in WEEKDAYS if d in found]
+
+
+def parse_days(lines: list[str]) -> tuple[list[str], list[dict[str, Any]]] | None:
+    """The schedule's day lines as (weekdays, seasonal extras), or None if any
+    line can't be read. 'Wed: April-June' is Wednesdays in months 4-6."""
+    weekdays: list[str] = []
+    seasonal: list[dict[str, Any]] = []
+    for line in lines:
+        m = _MONTH_RANGE_RE.match(line)
+        if m:
+            days, first, last = _weekdays(m.group(1)), _month(m.group(2)), _month(m.group(3))
+            if not days or not first or not last:
+                return None
+            months = list(range(first, last + 1)) if first <= last else list(range(first, 13)) + list(range(1, last + 1))
+            seasonal.append({"weekdays": days, "months": months})
+            continue
+        days = _weekdays(line)
+        if days is None:
+            return None
+        weekdays += [d for d in days if d not in weekdays]
+    return [d for d in WEEKDAYS if d in weekdays], seasonal
+
+
+def frequency_window(center: str, window: str) -> tuple[str, str] | None:
+    """'28.500-28.695' or '+/- 7 kHz' (around the net frequency) as (low, high) MHz."""
+    m = _WINDOW_RANGE_RE.match(window.strip())
+    if m:
+        return m.group(1), m.group(2)
+    m = _WINDOW_OFFSET_RE.match(window.strip())
+    if m:
+        try:
+            f, off = float(center), float(m.group(1)) / 1000
+        except ValueError:
+            return None
+        places = max(3, len(center.partition(".")[2]))
+        return f"{f - off:.{places}f}", f"{f + off:.{places}f}"
+    return None
+
+
 def net_schedule(page: str) -> dict[str, Any]:
     # Footnote marks (<sup>1,2</sup>) become "[fn:1,2]" so they survive as text.
     content = re.sub(r"<sup>\s*([\d,\s]+?)\s*</sup>", r" [fn:\1]", main_content(page), flags=re.I)
@@ -115,11 +180,17 @@ def net_schedule(page: str) -> dict[str, Any]:
             coordinator["name"] = parts[1]
         if len(parts) > 2 and _int(parts[2]) is not None:
             coordinator["om_number"] = _int(parts[2])
+        parsed = parse_days(day_lines)
+        window = frequency_window(m.group(2), m.group(3))
         nets.append(_drop_empty({
             "band": band,
             "time_utc": f"{m.group(1)[:2]}:{m.group(1)[2:]}",
             "frequency_mhz": m.group(2),
             "frequency_window": m.group(3).strip(),
+            "window_low_mhz": window[0] if window else None,
+            "window_high_mhz": window[1] if window else None,
+            "weekdays_utc": parsed[0] if parsed else None,
+            "seasonal_utc": parsed[1] if parsed else None,
             "holiday_time_utc": f"{hol.group(1)[:2]}:{hol.group(1)[2:]}" if hol else None,
             "days": day_lines,
             "footnotes": sorted(set(refs)),

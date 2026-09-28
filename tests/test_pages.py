@@ -19,6 +19,8 @@ def test_net_schedule():
     first = s["nets"][0]
     assert first == {
         "band": "10m", "time_utc": "18:00", "frequency_mhz": "28.525", "frequency_window": "28.500-28.695",
+        "window_low_mhz": "28.500", "window_high_mhz": "28.695",
+        "weekdays_utc": ["Sat", "Sun"], "seasonal_utc": [{"weekdays": ["Wed"], "months": [4, 5, 6]}],
         "days": ["Sat & Sun", "Wed: April-June"], "footnotes": [1],
         "coordinator": {"callsign": "W1XAA", "name": "ALICE", "om_number": 1001},
     }
@@ -128,3 +130,23 @@ def test_a_changed_page_is_reported_not_guessed(parser):
 def test_nested_tables_are_separate():
     t = tables("<table><tr><td>a</td><td><table><tr><td>b</td></tr></table></td></tr></table>")
     assert t == [[["b"]], [["a", ""]]]
+
+
+def test_schedule_days_and_windows_are_structured():
+    b = {n["band"]: n for n in pages.net_schedule(sample("index.html"))["nets"]}
+    assert b["10m"]["weekdays_utc"] == ["Sat", "Sun"]
+    assert b["10m"]["seasonal_utc"] == [{"weekdays": ["Wed"], "months": [4, 5, 6]}]
+    assert b["12m"]["weekdays_utc"] == ["Sat", "Sun"]  # "Sat, Sun"
+    assert b["20m"]["weekdays_utc"] == ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]  # "Daily"
+    assert b["160m"]["weekdays_utc"] == ["Mon", "Sat", "Sun"]  # "Sat & Sun & Mon"
+    assert (b["10m"]["window_low_mhz"], b["10m"]["window_high_mhz"]) == ("28.500", "28.695")
+    assert (b["12m"]["window_low_mhz"], b["12m"]["window_high_mhz"]) == ("24.973", "24.987")  # +/- 7 kHz
+    assert (b["160m"]["window_low_mhz"], b["160m"]["window_high_mhz"]) == ("1.920", "1.940")
+
+
+def test_parse_days_refuses_what_it_cant_read():
+    assert pages.parse_days(["Sat & Sun"]) == (["Sat", "Sun"], [])
+    assert pages.parse_days(["Wed: October-December"]) == ([], [{"weekdays": ["Wed"], "months": [10, 11, 12]}])
+    assert pages.parse_days(["Wed: November-February"])[1][0]["months"] == [11, 12, 1, 2]
+    assert pages.parse_days(["Sat & Sun", "second Tuesday"]) is None
+    assert pages.parse_days(["Wed: Spring-Fall"]) is None

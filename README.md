@@ -19,7 +19,7 @@ pip install omiss-mcp    # or install it into your own environment
 
 | Tool | Description | Key Parameters |
 |------|-------------|----------------|
-| `omiss_net_schedule` | Every net's band, UTC time, frequency, days and band coordinator; holiday dates | — |
+| `omiss_net_schedule` | Every net's band, UTC time, frequency, days, band coordinator and next run; holiday dates | — |
 | `omiss_nets_on_air` | OMISS nets on the air now, from NetLogger | — |
 | `omiss_member_lookup` | One member: OM number, call, name, status, grid, state, county, last check-in | callsign or om_number |
 | `omiss_checkin_history` | Past nets, newest first, optionally only a member's, a band's or a date's | callsign, om_number, band, date, net_control |

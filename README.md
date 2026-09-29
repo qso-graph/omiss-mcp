@@ -1,7 +1,7 @@
 <!-- mcp-name: io.github.qso-graph/omiss-mcp -->
 # omiss-mcp
 
-[![PyPI](https://img.shields.io/pypi/v/omiss-mcp?label=PyPI&color=blue)](https://pypi.org/project/omiss-mcp/)
+[![PyPI](https://img.shields.io/pypi/v/omiss-mcp?label=PyPI&color=blue&cacheSeconds=3600)](https://pypi.org/project/omiss-mcp/)
 [![MCP Registry](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0%2Fservers%3Fsearch%3Dio.github.qso-graph%2Fomiss-mcp%26version%3Dlatest&query=%24.servers%5B0%5D.server.version&label=MCP%20Registry&color=blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.qso-graph/omiss-mcp&version=latest)
 
 MCP server for [OMISS](https://www.omiss.net/), the Old Man International Sideband Society: the net schedule, OMISS nets on the air now, member lookup, past nets and who checked in, the Statehood schedule, officers, awards and net statistics, through any MCP-compatible AI assistant.

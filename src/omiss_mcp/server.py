@@ -137,7 +137,9 @@ def omiss_net_schedule() -> dict[str, Any]:
     schedule's footnotes (holidays, winter schedule); and the federal holiday
     dates the holiday schedule follows. Days and times are UTC, so an evening
     net in the Americas falls on the previous local day; use next_utc and
-    as_of_utc to work out "today" in the user's time zone.
+    as_of_utc to work out "today" in the user's time zone. next_utc is the
+    listed start: nets often open early for check-ins, and a net on the air now
+    shows next_utc as its next run, so ask omiss_nets_on_air whether one is open.
 
     Returns:
         as_of_utc; nets with weekdays_utc, seasonal_utc, next_utc (or next_utc_note

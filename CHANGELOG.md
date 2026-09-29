@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3 (2026-09-29)
+
+From Patton's run on a live net:
+
+- `omiss_net_schedule` says that `next_utc` is the listed start: nets often open early for
+  check-ins, and a net on the air shows its next run, so `omiss_nets_on_air` is the check for
+  "is it on now". README section "Nets Open Early".
+
 ## 0.1.2 (2026-09-29)
 
 From Patton's cold test of 0.1.1:

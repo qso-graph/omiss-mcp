@@ -830,20 +830,20 @@ wheels = [
 
 [[package]]
 name = "netlogger-mcp"
-version = "0.1.1"
+version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "defusedxml" },
     { name = "fastmcp" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/91/37/cdb1cfa89bef6dcfaf35e0586364430851a930312286f5a6110b5f2969bd/netlogger_mcp-0.1.1.tar.gz", hash = "sha256:290f9ba7ba52e355b8fc6b1b3fb1285e6ebf0e56a4f55258e806991d8e0c462f", size = 30723, upload-time = "2026-09-28T18:00:01.28Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8d/dc/07bf885525f925f6c0dbb497b4e17a1cf273f5f243ab44ed26db98c18275/netlogger_mcp-0.1.2.tar.gz", hash = "sha256:9378241912ccb61d1d3bb79a6067ca87a3c48ce7dd2d9f45d6a5e980e52037d6", size = 149257, upload-time = "2026-09-29T00:01:50.366Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e8/36/56bc636a2981bc06ac81ace1a570b06f7c3ee9c7c6af42f46442e45d4114/netlogger_mcp-0.1.1-py3-none-any.whl", hash = "sha256:5dc1698cdad7d20a8a1d39eb07207effb3093f045d0f2276b1a9df2646e65e7c", size = 24363, upload-time = "2026-09-28T17:59:59.311Z" },
+    { url = "https://files.pythonhosted.org/packages/07/dd/1cc89b40d7975ab17394942d026c291ade46177d32117d298c34a902bf76/netlogger_mcp-0.1.2-py3-none-any.whl", hash = "sha256:7a4297df56b715976cb2fa63712b277c52706b332df6c13b04d25f19d7fe20cc", size = 25827, upload-time = "2026-09-29T00:01:48.961Z" },
 ]
 
 [[package]]
 name = "omiss-mcp"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "fastmcp" },
@@ -866,7 +866,7 @@ dev = [
 requires-dist = [
     { name = "fastmcp", specifier = ">=3.0" },
     { name = "jsonschema", marker = "extra == 'test'" },
-    { name = "netlogger-mcp", specifier = ">=0.1.1" },
+    { name = "netlogger-mcp", specifier = ">=0.1.2" },
     { name = "pytest", marker = "extra == 'test'" },
 ]
 provides-extras = ["test"]

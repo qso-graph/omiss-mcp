@@ -164,6 +164,12 @@
         },
         "next_utc_note": {
           "type": "string"
+        },
+        "season": {
+          "enum": [
+            "winter"
+          ],
+          "description": "Runs only on the winter schedule (footnotes 2 and 3); weekdays_utc applies within that season"
         }
       },
       "required": [

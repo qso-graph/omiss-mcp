@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.2 (2026-09-29)
+
+From Patton's cold test of 0.1.1:
+
+- Requires netlogger-mcp 0.1.2, which shares answers between copies as well as the call budget.
+  When netlogger-mcp has just fetched the active nets, `omiss_nets_on_air` gets that answer
+  instead of a "try again" error.
+- `as_of_utc` on error responses too.
+- Winter-schedule nets carry `season: "winter"`, so `weekdays_utc` isn't read as year-round.
+
 ## 0.1.1 (2026-09-28)
 
 From Patton's cold-seat test (#4, #5):

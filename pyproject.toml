@@ -1,6 +1,6 @@
 [project]
 name = "omiss-mcp"
-version = "0.1.1"
+version = "0.1.2"
 description = "MCP server for OMISS: net schedule, nets on the air, members, check-in history, Statehood, officers and awards"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
@@ -8,7 +8,7 @@ authors = [{name = "Greg Beam, KI7MT", email = "ki7mt@yahoo.com"}]
 requires-python = ">=3.10"
 dependencies = [
     "fastmcp>=3.0",
-    "netlogger-mcp>=0.1.1",
+    "netlogger-mcp>=0.1.2",
 ]
 keywords = [
     "amateur-radio", "ham-radio", "omiss", "sideband", "nets", "check-ins", "awards",

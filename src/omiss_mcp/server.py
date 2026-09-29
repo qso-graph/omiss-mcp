@@ -88,13 +88,17 @@ def _get_source() -> OmissSource:
     return _source
 
 
+def _as_of() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def _run(method: str, *args) -> dict[str, Any]:
     try:
         return getattr(_get_source(), method)(*args)
     except OmissError as e:
-        return {"error": str(e)}
+        return {"error": str(e), "as_of_utc": _as_of()}
     except Exception:
-        return {"error": "omiss-mcp hit an unexpected problem"}
+        return {"error": "omiss-mcp hit an unexpected problem", "as_of_utc": _as_of()}
 
 
 NEEDS_CALLSIGN = {
@@ -155,19 +159,18 @@ def omiss_nets_on_air() -> dict[str, Any]:
         if _netlogger is None:
             callsign = netlogger_settings.load_callsign()
             if callsign is None:
-                return dict(NEEDS_CALLSIGN)
+                return {**NEEDS_CALLSIGN, "as_of_utc": _as_of()}
             if _mock():
                 _netlogger = NetLoggerSource(callsign, "omiss-mcp", __version__,
                                              fetch=_mock_netlogger_fetch,
                                              limiter=RateLimiter(NETLOGGER_LIMITS), cache=Cache())
             else:
                 _netlogger = NetLoggerSource(callsign, "omiss-mcp", __version__)
-        result = _netlogger.active_nets(name_like="OMISS")
-        return {**result, "as_of_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+        return {"as_of_utc": _as_of(), **_netlogger.active_nets(name_like="OMISS")}
     except NetLoggerError as e:
-        return {"error": str(e)}
+        return {"error": str(e), "as_of_utc": _as_of()}
     except Exception:
-        return {"error": "omiss-mcp hit an unexpected problem"}
+        return {"error": "omiss-mcp hit an unexpected problem", "as_of_utc": _as_of()}
 
 
 @mcp.tool()
@@ -187,9 +190,9 @@ def omiss_set_callsign(callsign: str) -> dict[str, Any]:
     try:
         saved = netlogger_settings.save_callsign(callsign)
     except NetLoggerError as e:
-        return {"error": str(e)}
+        return {"error": str(e), "as_of_utc": _as_of()}
     except OSError:
-        return {"error": "the callsign couldn't be saved to the settings file"}
+        return {"error": "the callsign couldn't be saved to the settings file", "as_of_utc": _as_of()}
     _netlogger = None
     return {"callsign": saved, "saved": True}
 

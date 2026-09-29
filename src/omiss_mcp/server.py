@@ -341,8 +341,22 @@ def omiss_net_statistics(state: str | None = "", top: int | None = 10) -> dict[s
     return _run("net_statistics", state or None, top if top is not None else 10)
 
 
+USAGE = """usage: omiss-mcp [--transport stdio|streamable-http] [--port N] [--version] [--help]
+
+An MCP server: an AI app (Claude Desktop, Claude Code, ...) starts it and talks
+to it over stdio. Run on its own it waits for that app; press Ctrl-C to stop.
+Set up a client: https://github.com/qso-graph/omiss-mcp#quick-start
+"""
+
+
 def main() -> None:
     """Run the omiss-mcp server."""
+    if any(a in ("-h", "--help") for a in sys.argv[1:]):
+        print(USAGE, end="")
+        return
+    if "--version" in sys.argv[1:]:
+        print(f"omiss-mcp {__version__}")
+        return
     transport = "stdio"
     port = 8015
     for i, arg in enumerate(sys.argv[1:], 1):

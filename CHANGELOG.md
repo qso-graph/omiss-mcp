@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Schema: `frequency_window` (and `window_low_mhz`/`window_high_mhz`) described as what it is: the
+  net's legal operating range for its sideband, not a range it moves around in (Watson and Patton,
+  checked across four bands).
+
 ## 0.1.5 (2026-09-29)
 
 From Patton's full acceptance run of 0.1.4:

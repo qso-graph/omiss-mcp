@@ -80,7 +80,8 @@
           "type": "string"
         },
         "frequency_window": {
-          "type": "string"
+          "type": "string",
+          "description": "As omiss.net prints it beside the frequency: the net's legal operating range for its sideband (the General-class phone segment, trimmed where a lower- or upper-sideband signal needs room). Not a range the net moves around in"
         },
         "holiday_time_utc": {
           "type": "string",
@@ -102,10 +103,12 @@
           "$ref": "#/$defs/person"
         },
         "window_low_mhz": {
-          "type": "string"
+          "type": "string",
+          "description": "Low end of frequency_window, in MHz"
         },
         "window_high_mhz": {
-          "type": "string"
+          "type": "string",
+          "description": "High end of frequency_window, in MHz"
         },
         "weekdays_utc": {
           "type": "array",

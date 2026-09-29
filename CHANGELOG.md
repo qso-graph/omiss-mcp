@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.5 (2026-09-29)
+
+From Patton's full acceptance run of 0.1.4:
+
+- **`last_checkin` was 4 hours early.** omiss.net's member roster prints US Eastern time, not UTC
+  (checked on two members against the UTC check-in history). It's now converted to UTC, EDT or
+  EST as the date requires. Windows installs `tzdata` for the zone data.
+- **`omiss_net_checkins` split the member cell.** The archive joins NetLogger's member ID and
+  remarks ("#11055# 1 CALL"); `member_id` is now the ID and the rest is `remarks`, as NetLogger
+  returns them.
+- **Vacant officer rows keep their year** (OM of the Year 1996 was a vacancy with no year).
+- **A date that's the right shape but not a real date** ("2026-13") now says so, rather than
+  repeating the format.
+- **`rules_url`** points at the award's own entry on the rules page.
+
 ## 0.1.4 (2026-09-29)
 
 - `--help` and `--version` print and exit (the server used to start and wait for a client, which

@@ -41,8 +41,9 @@ def test_members_and_no_match():
     found = pages.members(sample("searchResults.html"))
     assert [m["callsign"] for m in found] == ["W1OMS", "W1OMSX"]
     assert found[0]["first_responder"] == ["Firefighter"]
-    assert found[0]["last_checkin"] == "2026-09-26T19:30:02Z"
-    assert found[1]["silent_key"] is True and found[1]["last_checkin"] == "2019-03-07T02:05:00Z"
+    # The roster prints US Eastern time: EDT (UTC-4) in September, EST (UTC-5) in March.
+    assert found[0]["last_checkin"] == "2026-09-26T23:30:02Z"
+    assert found[1]["silent_key"] is True and found[1]["last_checkin"] == "2019-03-07T07:05:00Z"
     assert pages.members(sample("searchResults_none.html")) == []
 
 
@@ -59,8 +60,11 @@ def test_net_checkins():
     assert n["net_control"] == "W3XCC" and n["relays"] == ["W2XBB", "W4XDD"]
     assert n["archived_by"] == "W3XCC" and n["closed_at_utc"] == "19:28"
     assert n["checkin_count"] == 3 and n["log_notes"] == ["NET CLOSED:19:28"]
-    assert n["checkins"][1]["om_number"] == 999
-    assert "om_number" not in n["checkins"][2]  # a visitor, not a member
+    assert n["checkins"][0]["member_id"] == "1003" and n["checkins"][0]["remarks"] == "2 CALLS"
+    assert n["checkins"][1]["om_number"] == 999 and n["checkins"][1]["remarks"] == "1"
+    visitor = n["checkins"][2]  # not a member: no ID, and the note is a remark
+    assert "om_number" not in visitor and "member_id" not in visitor
+    assert visitor["remarks"] == "FAM needs #'s"
     assert "[email removed]" in n["notes"] and "@" not in n["notes"]
     assert pages.net_checkins(sample("displayCheckinHistory_none.html")) is None
 
@@ -84,7 +88,8 @@ def test_officers():
     assert by["Charter Members"]["text"] == ["OM #01-110"]
     assert by["Past Presidents"]["people"][0] == {
         "term": "1982-1983", "callsign": "K1XFF", "name": "FRANK", "om_number": 16, "silent_key": True}
-    assert by["OM Of The Year"]["people"][1] == {"year": 2015, "callsign": "K7XII", "name": "IVY", "om_number": 1007}
+    assert by["OM Of The Year"]["people"][1] == {"year": 1996, "vacant": True}
+    assert by["OM Of The Year"]["people"][2] == {"year": 2015, "callsign": "K7XII", "name": "IVY", "om_number": 1007}
 
 
 def test_awards_and_rules():

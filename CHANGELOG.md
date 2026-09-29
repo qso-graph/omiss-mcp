@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.4 (2026-09-29)
+
+- `--help` and `--version` print and exit (the server used to start and wait for a client, which
+  looked like a hang).
+
 ## 0.1.3 (2026-09-29)
 
 From Patton's run on a live net:

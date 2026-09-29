@@ -124,3 +124,10 @@ def test_errors_carry_as_of():
     for r in (call("omiss_member_lookup", {}), call("omiss_checkin_history", {"band": "6m"}),
               call("omiss_nets_on_air")):
         assert "error" in r and r["as_of_utc"].endswith("Z")
+
+
+def test_help_and_version_exit_without_serving(capsys, monkeypatch):
+    for arg, expect in (("--help", "usage: omiss-mcp"), ("-h", "usage: omiss-mcp"), ("--version", "omiss-mcp ")):
+        monkeypatch.setattr("sys.argv", ["omiss-mcp", arg])
+        server.main()  # returns instead of serving
+        assert expect in capsys.readouterr().out

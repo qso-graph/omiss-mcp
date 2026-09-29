@@ -37,6 +37,10 @@ pip install omiss-mcp    # or install it into your own environment
 
 OMISS is an amateur-radio society that runs SSB nets on HF, from 10 to 160 meters, every day of the week. Members exchange OM numbers on the nets and work toward the society's awards. Its website publishes the net schedule, the member roster, check-in history for every net, and the award rules and recipients.
 
+## Nets Open Early
+
+Net control often opens a net in NetLogger for check-ins well before its listed time (the 40m net has opened 35 minutes early). `omiss_net_schedule` gives the listed times; `omiss_nets_on_air` shows whether a net is open now.
+
 ## Your Callsign
 
 Only `omiss_nets_on_air` needs it: it asks NetLogger, which is told which station is asking. On first use the assistant asks for your callsign and saves it. You're asked once. The other tools don't need it.

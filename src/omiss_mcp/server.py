@@ -154,7 +154,8 @@ def omiss_nets_on_air() -> dict[str, Any]:
 
     Returns:
         as_of_utc, and nets with server, name, frequency, band, mode, net control,
-        when opened and how many are monitoring.
+        when opened and how many are monitoring. servers counts every net NetLogger
+        listed on each server, before the OMISS filter.
     """
     global _netlogger
     try:

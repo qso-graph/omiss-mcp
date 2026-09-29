@@ -85,7 +85,8 @@ def test_history_and_net():
     n = valid(call("omiss_net_checkins", {"net_id": 5}), "net_checkins")
     assert n["found"] is False
     assert "error" in call("omiss_checkin_history", {"band": "6m"})
-    assert "error" in call("omiss_checkin_history", {"date": "2026-13"})
+    assert "real date" in call("omiss_checkin_history", {"date": "2026-13"})["error"]
+    assert "YYYY" in call("omiss_checkin_history", {"date": "Sept 2026"})["error"]
 
 
 def test_statehood_officers_awards():
@@ -95,7 +96,7 @@ def test_statehood_officers_awards():
     assert a["total"] == 3
     valid(call("omiss_award_rules"), "award_rules")
     r = valid(call("omiss_award_rules", {"award_id": "100gold"}), "award_rules")
-    assert r["award_id"] == "100GOLD" and r["rules_url"].startswith("https://")
+    assert r["award_id"] == "100GOLD" and r["rules_url"].endswith("awardRules.php#100GOLD")
     r = valid(call("omiss_award_recipients", {"award_id": "alphabetsoup", "limit": 2}), "award_recipients")
     assert r["total"] == 3 and r["returned"] == 2 and r["recipients"][0]["certificate"] == "3"
     r = valid(call("omiss_award_recipients", {"award_id": "ALPHABETSOUP", "om_number": 999}), "award_recipients")

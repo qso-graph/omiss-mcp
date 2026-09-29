@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import html as _html
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import Any
 
 from .html import PageChanged, clean, find_table, main_content, one_line, prepare, tables, text_of
@@ -48,6 +49,24 @@ def utc_time(value: str) -> str | None:
         return datetime(y, mo, d, h, mi, s).strftime("%Y-%m-%dT%H:%M:%SZ")
     except ValueError:
         return None
+
+
+# The member roster's "Date Last Checkin" is US Eastern time, not UTC: the same
+# net shows 4 hours later in the (UTC) check-in history in summer, 5 in winter.
+EASTERN = ZoneInfo("America/New_York")
+
+
+def eastern_to_utc(value: str) -> str | None:
+    """'2026-09-27 16:59:10' (US Eastern) -> '2026-09-27T20:59:10Z'."""
+    m = _DT_RE.search(value or "")
+    if not m:
+        return None
+    y, mo, d, h, mi, s = (int(g) for g in m.groups())
+    try:
+        local = datetime(y, mo, d, h, mi, s, tzinfo=EASTERN)
+    except ValueError:
+        return None
+    return local.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _int(value: str) -> int | None:
@@ -262,7 +281,7 @@ def members(page: str) -> list[dict[str, Any]]:
             "qsl_bureau_envelopes": _int(env),
             "military": one_line(military),
             "first_responder": responder,
-            "last_checkin": utc_time(last),
+            "last_checkin": eastern_to_utc(last),
         }))
     return out
 
@@ -359,7 +378,10 @@ def net_checkins(page: str) -> dict[str, Any] | None:
             if line:
                 log_lines.append(line)
             continue
-        om = re.match(r"#?(\d+)#?", member)
+        # The archive joins NetLogger's member ID and remarks in one cell:
+        # "#11055# 1 CALL", "# # FAM needs #'s", "#15719# formerly KJ5RPM".
+        cell = re.match(r"^#\s*(\d*)\s*#\s*(.*)$", member)
+        member_id, remarks = (cell.group(1), cell.group(2).strip()) if cell else (member, "")
         checkins.append(_drop_empty({
             "serial": _int(serial.rstrip(".")),
             "callsign": call.upper(),
@@ -370,8 +392,9 @@ def net_checkins(page: str) -> dict[str, Any] | None:
             "grid": grid,
             "status": status,
             "qsl_info": qsl,
-            "member_id": member,
-            "om_number": int(om.group(1)) if om else None,
+            "member_id": member_id,
+            "om_number": int(member_id) if member_id.isdigit() else None,
+            "remarks": remarks,
         }))
     net["log_notes"] = log_lines
     return _drop_empty(net) | {"checkin_count": len(checkins), "checkins": checkins}
@@ -437,7 +460,13 @@ def officers(page: str) -> list[dict[str, Any]]:
                     person = {"role": role} | person
                 people.append(_drop_empty(person | {"silent_key": True if sk else None, "note": clean(note)}))
             elif "OPEN POSITION" in line.upper():
-                people.append(_drop_empty({"role": pending_role, "vacant": True}))
+                when = re.match(r"^(\d{4})(?:-(\d{4}))?\s", line)
+                vacant = {"role": pending_role, "vacant": True}
+                if when and when.group(2):
+                    vacant = {"term": f"{when.group(1)}-{when.group(2)}", "vacant": True}
+                elif when:
+                    vacant = {"year": int(when.group(1)), "vacant": True}
+                people.append(_drop_empty(vacant))
                 pending_role = None
             elif "#" not in line and not re.search(r"\d", line.split()[0] if line.split() else ""):
                 pending_role = clean(line)  # a role heading; the person is on the next line

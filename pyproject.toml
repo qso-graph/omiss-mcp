@@ -1,6 +1,6 @@
 [project]
 name = "omiss-mcp"
-version = "0.1.4"
+version = "0.1.5"
 description = "MCP server for OMISS: net schedule, nets on the air, members, check-in history, Statehood, officers and awards"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
@@ -9,6 +9,7 @@ requires-python = ">=3.10"
 dependencies = [
     "fastmcp>=3.0",
     "netlogger-mcp>=0.1.2",
+    "tzdata; sys_platform == 'win32'",  # the roster's US Eastern times; Windows has no zone data
 ]
 keywords = [
     "amateur-radio", "ham-radio", "omiss", "sideband", "nets", "check-ins", "awards",

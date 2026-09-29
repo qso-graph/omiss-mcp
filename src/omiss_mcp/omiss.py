@@ -109,16 +109,15 @@ def history_date(value: str | None) -> str:
     """YYYY, YYYY-MM or YYYY-MM-DD, and a real date."""
     text = (value or "").strip()
     m = _DATE_RE.fullmatch(text)
-    ok = bool(m)
-    if m:
-        y, mo, d = int(m.group(1)), int(m.group(2) or 1), int(m.group(3) or 1)
-        try:
-            date(y, mo, d)
-        except ValueError:
-            ok = False
-        ok = ok and 1982 <= y <= 2100
-    if not ok:
+    if not m:
         raise OmissError("date must be YYYY, YYYY-MM or YYYY-MM-DD (e.g. 2026-09)")
+    y, mo, d = int(m.group(1)), int(m.group(2) or 1), int(m.group(3) or 1)
+    if not 1982 <= y <= 2100:
+        raise OmissError(f"date {text}: the year must be 1982 or later (OMISS's first nets)")
+    try:
+        date(y, mo, d)
+    except ValueError:
+        raise OmissError(f"date {text} isn't a real date (check the month and day)") from None
     return text
 
 
@@ -436,7 +435,7 @@ class OmissSource:
                 raise OmissError("award_id must be an ID from omiss_awards (e.g. ALPHABETSOUP)")
             raise OmissError(f"no OMISS award has the ID {award_id}; omiss_award_rules with no ID lists them")
         return {"source": SOURCE, "note": value.get("note"), **match[0],
-                "rules_url": BASE + "awardRules.php", **info}
+                "rules_url": BASE + "awardRules.php#" + match[0]["award_id"], **info}
 
     def award_recipients(
         self,

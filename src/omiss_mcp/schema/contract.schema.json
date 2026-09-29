@@ -222,7 +222,8 @@
           }
         },
         "last_checkin": {
-          "$ref": "#/$defs/utc_time"
+          "$ref": "#/$defs/utc_time",
+          "description": "UTC. omiss.net's roster prints US Eastern time; converted here"
         }
       },
       "required": [
@@ -285,10 +286,15 @@
           "type": "string"
         },
         "member_id": {
-          "type": "string"
+          "type": "string",
+          "description": "The member ID as logged (digits), when there is one"
         },
         "om_number": {
           "$ref": "#/$defs/om_number"
+        },
+        "remarks": {
+          "type": "string",
+          "description": "The logger's remarks, split from the archive's member-ID cell"
         }
       },
       "required": [

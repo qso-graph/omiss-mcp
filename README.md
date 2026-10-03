@@ -12,7 +12,6 @@ Data from omiss.net's public pages; nets on the air from NetLogger. Part of the 
 
 ```bash
 uvx omiss-mcp            # run it; nothing to install
-pip install omiss-mcp    # or install it into your own environment
 ```
 
 ## Tools
@@ -158,8 +157,6 @@ Add to `~/.gemini/settings.json` (global) or `.gemini/settings.json` (project):
   }
 }
 ```
-
-Installed with pip instead? Use `"command": "omiss-mcp"` in any config above.
 
 ### Ask questions
 

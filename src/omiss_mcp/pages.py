@@ -484,7 +484,10 @@ def officers(page: str) -> list[dict[str, Any]]:
 # Awards
 # ---------------------------------------------------------------------------
 
-_AWARD_LINK_RE = re.compile(r'<a href="GenAwardReport\.php\?AwardID=([A-Za-z0-9]+)"\s*>(.*?)</a>', re.I)
+# Award IDs are letters and digits, and a few have hyphens (WAS-KN4OM, MIL-1ST-RESP, PATRIOT-TOPOP,
+# Patriot-NCSQTR); cutting at the hyphen made WAS-KN4OM read as WAS.
+_AWARD_ID = r"[A-Za-z0-9][A-Za-z0-9-]*"
+_AWARD_LINK_RE = re.compile(r'<a href="GenAwardReport\.php\?AwardID=(' + _AWARD_ID + r')"\s*>(.*?)</a>', re.I)
 
 
 def awards(page: str) -> list[dict[str, str]]:
@@ -508,7 +511,7 @@ def award_rules(page: str) -> dict[str, Any]:
     note = re.search(r"<h3>\s*<center>(.*?)</center>\s*</h3>", content, re.S | re.I)
     rules = []
     for box in content.split('<div class="sidebarbox">')[1:]:
-        h = re.search(r"<h3>(.*?)(?:<a [^>]*AwardID=([A-Za-z0-9]+)[^>]*>.*?</a>)?\s*</h3>", box, re.S | re.I)
+        h = re.search(r"<h3>(.*?)(?:<a [^>]*AwardID=(" + _AWARD_ID + r")[^>]*>.*?</a>)?\s*</h3>", box, re.S | re.I)
         if not h or not h.group(2):
             continue
         award_id = h.group(2)

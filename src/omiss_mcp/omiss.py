@@ -415,7 +415,7 @@ class OmissSource:
     def _award_id(self, value: str | None) -> str:
         """The site's own ID for an award, from its award list (never free text)."""
         text = (value or "").strip()
-        if not re.fullmatch(r"[A-Za-z0-9]{1,32}", text):
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,31}", text):
             raise OmissError("award_id must be an ID from omiss_awards (e.g. ALPHABETSOUP)")
         listed = {a["award_id"].upper(): a["award_id"] for a in self.awards()["awards"]}
         if text.upper() not in listed:
@@ -431,7 +431,7 @@ class OmissSource:
         wanted = (award_id or "").strip().upper()
         match = [a for a in value["awards"] if a["award_id"].upper() == wanted]
         if not match:
-            if not re.fullmatch(r"[A-Za-z0-9]{1,32}", wanted):
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,31}", wanted):
                 raise OmissError("award_id must be an ID from omiss_awards (e.g. ALPHABETSOUP)")
             raise OmissError(f"no OMISS award has the ID {award_id}; omiss_award_rules with no ID lists them")
         return {"source": SOURCE, "note": value.get("note"), **match[0],

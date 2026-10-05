@@ -178,3 +178,13 @@ def test_hyphenated_award_ids_are_kept_whole():
     kn4om = r["awards"][0]
     assert kn4om["award_id"] == "WAS-KN4OM" and kn4om["rules"]  # the detail div (WAS-KN4OMx) was found
 
+
+def test_award_id_naming_two_awards_fails_loudly():
+    page = sample("awardRecipients.html").replace(
+        '<a href="GenAwardReport.php?AwardID=ALPHABETSOUP">Alphabet Soup</a>',
+        '<a href="GenAwardReport.php?AwardID=ALPHABETSOUP">Alphabet Soup</a>'
+        '<a href="GenAwardReport.php?AwardID=ALPHABETSOUP">Alphabet Soup</a>'  # the same award twice: kept once
+        '<a href="GenAwardReport.php?AwardID=alphabetsoup">Something Else</a>')  # a different award: an error
+    with pytest.raises(pages.PageChanged):
+        pages.awards(page)
+

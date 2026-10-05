@@ -491,12 +491,17 @@ _AWARD_LINK_RE = re.compile(r'<a href="GenAwardReport\.php\?AwardID=(' + _AWARD_
 
 
 def awards(page: str) -> list[dict[str, str]]:
-    seen, out = set(), []
+    seen: dict[str, str] = {}
+    out = []
     for award_id, name in _AWARD_LINK_RE.findall(main_content(page)):
+        name = text_of(name)
         if award_id.upper() in seen:
-            continue
-        seen.add(award_id.upper())
-        out.append({"award_id": award_id, "name": text_of(name)})
+            if seen[award_id.upper()] == name:
+                continue  # the same award linked twice
+            # Two different awards behind one ID: never drop one silently (WAS-KN4OM once read as WAS).
+            raise PageChanged(f"the award list (ID {award_id} names two awards)")
+        seen[award_id.upper()] = name
+        out.append({"award_id": award_id, "name": name})
     if not out:
         raise PageChanged("the award list")
     return out

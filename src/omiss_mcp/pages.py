@@ -484,16 +484,24 @@ def officers(page: str) -> list[dict[str, Any]]:
 # Awards
 # ---------------------------------------------------------------------------
 
-_AWARD_LINK_RE = re.compile(r'<a href="GenAwardReport\.php\?AwardID=([A-Za-z0-9]+)"\s*>(.*?)</a>', re.I)
+# Award IDs are letters and digits, and a few have hyphens (WAS-KN4OM, MIL-1ST-RESP, PATRIOT-TOPOP,
+# Patriot-NCSQTR); cutting at the hyphen made WAS-KN4OM read as WAS.
+_AWARD_ID = r"[A-Za-z0-9][A-Za-z0-9-]*"
+_AWARD_LINK_RE = re.compile(r'<a href="GenAwardReport\.php\?AwardID=(' + _AWARD_ID + r')"\s*>(.*?)</a>', re.I)
 
 
 def awards(page: str) -> list[dict[str, str]]:
-    seen, out = set(), []
+    seen: dict[str, str] = {}
+    out = []
     for award_id, name in _AWARD_LINK_RE.findall(main_content(page)):
+        name = text_of(name)
         if award_id.upper() in seen:
-            continue
-        seen.add(award_id.upper())
-        out.append({"award_id": award_id, "name": text_of(name)})
+            if seen[award_id.upper()] == name:
+                continue  # the same award linked twice
+            # Two different awards behind one ID: never drop one silently (WAS-KN4OM once read as WAS).
+            raise PageChanged(f"the award list (ID {award_id} names two awards)")
+        seen[award_id.upper()] = name
+        out.append({"award_id": award_id, "name": name})
     if not out:
         raise PageChanged("the award list")
     return out
@@ -508,7 +516,7 @@ def award_rules(page: str) -> dict[str, Any]:
     note = re.search(r"<h3>\s*<center>(.*?)</center>\s*</h3>", content, re.S | re.I)
     rules = []
     for box in content.split('<div class="sidebarbox">')[1:]:
-        h = re.search(r"<h3>(.*?)(?:<a [^>]*AwardID=([A-Za-z0-9]+)[^>]*>.*?</a>)?\s*</h3>", box, re.S | re.I)
+        h = re.search(r"<h3>(.*?)(?:<a [^>]*AwardID=(" + _AWARD_ID + r")[^>]*>.*?</a>)?\s*</h3>", box, re.S | re.I)
         if not h or not h.group(2):
             continue
         award_id = h.group(2)

@@ -155,3 +155,36 @@ def test_parse_days_refuses_what_it_cant_read():
     assert pages.parse_days(["Wed: November-February"])[1][0]["months"] == [11, 12, 1, 2]
     assert pages.parse_days(["Sat & Sun", "second Tuesday"]) is None
     assert pages.parse_days(["Wed: Spring-Fall"]) is None
+
+
+def test_hyphenated_award_ids_are_kept_whole():
+    """WAS-KN4OM read as WAS, colliding with the basic WAS award; Patriot-NCSQTR and PATRIOT-TOPOP read as
+    Patriot and PATRIOT, and the case-insensitive de-duplication then dropped one of them."""
+    links = sample("awardRecipients.html").replace(
+        '<a href="GenAwardReport.php?AwardID=ALPHABETSOUP">Alphabet Soup</a>',
+        '<a href="GenAwardReport.php?AwardID=ALPHABETSOUP">Alphabet Soup</a>'
+        '<a href="GenAwardReport.php?AwardID=WAS-KN4OM">KN4OM in all States</a>'
+        '<a href="GenAwardReport.php?AwardID=Patriot-NCSQTR">Patriot NCS</a>'
+        '<a href="GenAwardReport.php?AwardID=PATRIOT-TOPOP">Patriot Top Op</a>')
+    ids = [a["award_id"] for a in pages.awards(links)]
+    assert {"WAS-KN4OM", "Patriot-NCSQTR", "PATRIOT-TOPOP"} <= set(ids)
+    assert not {"WAS", "Patriot", "PATRIOT"} & set(ids)
+
+    rules = sample("awardRules.html")
+    start = rules.index('<div class="sidebarbox">')
+    end = rules.index('<div class="sidebarbox">', start + 1)
+    box = rules[start:end].replace("100GOLD", "WAS-KN4OM")
+    r = pages.award_rules(rules[:start] + box + rules[start:])
+    kn4om = r["awards"][0]
+    assert kn4om["award_id"] == "WAS-KN4OM" and kn4om["rules"]  # the detail div (WAS-KN4OMx) was found
+
+
+def test_award_id_naming_two_awards_fails_loudly():
+    page = sample("awardRecipients.html").replace(
+        '<a href="GenAwardReport.php?AwardID=ALPHABETSOUP">Alphabet Soup</a>',
+        '<a href="GenAwardReport.php?AwardID=ALPHABETSOUP">Alphabet Soup</a>'
+        '<a href="GenAwardReport.php?AwardID=ALPHABETSOUP">Alphabet Soup</a>'  # the same award twice: kept once
+        '<a href="GenAwardReport.php?AwardID=alphabetsoup">Something Else</a>')  # a different award: an error
+    with pytest.raises(pages.PageChanged):
+        pages.awards(page)
+

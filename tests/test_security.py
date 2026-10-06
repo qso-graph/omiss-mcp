@@ -106,6 +106,11 @@ SAMPLES = {
     "awardRules.php": "awardRules.html",
     "GenAwardReport.php": "GenAwardReport.html",
     "statistics.php": "statistics.html",
+    "rosterXML.php": "rosterXML.xml",
+    "militaryRoster.php": "militaryRoster.html",
+    "firstResponderRoster.php": "firstResponderRoster.html",
+    "stateCapitalRoster.php": "stateCapitalRoster.html",
+    "SKRoster.php": "SKRoster.html",
 }
 
 # Parameters each page may be sent, and nothing else.
@@ -188,7 +193,8 @@ def test_every_request_is_https_to_omiss_with_known_params(spy):
     source.award_rules("100GOLD")
     source.award_recipients("alphabetsoup")
     source.net_statistics("CT")
-    assert len(s.urls) >= 9
+    source.eligibility(["W1OMS"])
+    assert len(s.urls) >= 14
     _check_urls(s.urls)
 
 
@@ -203,6 +209,7 @@ def test_no_email_or_address_or_sql_returned(spy):
         source.checkin_history(), source.net_checkins(30001), source.statehood_schedule(),
         source.officers(), source.awards(), source.award_rules(), source.award_rules("100GOLD"),
         source.award_recipients("ALPHABETSOUP"), source.net_statistics("CT"),
+        source.eligibility(["W1OMS", "W2XBB", "W3XCC", "KX0AA"]),
     ])
     assert not re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", out)
     assert "PO Box" not in out and "Box 0000" not in out and "00000" not in out

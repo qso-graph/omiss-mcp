@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- omiss-mcp's own NetLogger sample (GetActiveNets), shaped like a real response. Synthetic: made-up
+     callsigns. Times fit the sample OMISS schedule (index.html): 2026-10-03 is a Saturday. -->
+<NetLoggerXML>
+ <Header>
+  <CreationDateUTC>Sat 10/03/2026 18:40:00</CreationDateUTC>
+  <Copyright>The NetLogger System 2026</Copyright>
+  <APIVersion>1.3.1</APIVersion>
+  <TimeZone>UTC</TimeZone>
+ </Header>
+ <ServerList>
+  <ResponseCode>200 OK</ResponseCode>
+  <Server>
+   <ServerName>NETLOGGER2</ServerName>
+   <ServerActiveNetCount>3</ServerActiveNetCount>
+   <Net>
+    <NetName>OMISS 20m SSB Net</NetName>
+    <AltNetName>OMISS 20m SSB Net</AltNetName>
+    <Frequency>14.290</Frequency>
+    <Logger>N0CALL - v3.1.7L</Logger>
+    <NetControl>W3XCC</NetControl>
+    <Date>2026-10-03 18:28:00</Date>
+    <Mode>SSB</Mode>
+    <Band>20m</Band>
+    <SubscriberCount>21</SubscriberCount>
+   </Net>
+   <Net>
+    <NetName>Sideband Saturday</NetName>
+    <AltNetName>Sideband Saturday</AltNetName>
+    <Frequency>3.950</Frequency>
+    <Logger>K1CALL - v3.1.7L</Logger>
+    <NetControl>W4XDD</NetControl>
+    <Date>2026-10-04 04:58:00</Date>
+    <Mode>SSB</Mode>
+    <Band>80m</Band>
+    <SubscriberCount>9</SubscriberCount>
+   </Net>
+   <Net>
+    <NetName>OMISS Informal Net</NetName>
+    <AltNetName>OMISS Informal Net</AltNetName>
+    <Frequency>7.200</Frequency>
+    <Logger>K2CALL - v3.1.7L</Logger>
+    <NetControl>K2CALL</NetControl>
+    <Date>2026-10-03 22:00:00</Date>
+    <Mode>SSB</Mode>
+    <Band>40m</Band>
+    <SubscriberCount>4</SubscriberCount>
+   </Net>
+  </Server>
+  <Server>
+   <ServerName>NETLOGGER</ServerName>
+   <ServerActiveNetCount>2</ServerActiveNetCount>
+   <Net>
+    <NetName>Morning Coffee Net</NetName>
+    <AltNetName>Morning Coffee Net</AltNetName>
+    <Frequency>14.300</Frequency>
+    <Logger>K3CALL - v3.1.7L</Logger>
+    <NetControl>K3CALL</NetControl>
+    <Date>2026-10-03 23:59:00</Date>
+    <Mode>SSB</Mode>
+    <Band>20m</Band>
+    <SubscriberCount>6</SubscriberCount>
+   </Net>
+   <Net>
+    <NetName>County ARES Net</NetName>
+    <AltNetName>County ARES Net</AltNetName>
+    <Frequency>146.880</Frequency>
+    <Logger>K4CALL - v3.1.7L</Logger>
+    <NetControl>K4CALL</NetControl>
+    <Date>2026-10-03 18:30:00</Date>
+    <Mode>FM</Mode>
+    <Band>2m</Band>
+    <SubscriberCount>3</SubscriberCount>
+   </Net>
+  </Server>
+ </ServerList>
+</NetLoggerXML>

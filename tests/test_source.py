@@ -175,3 +175,69 @@ def test_winter_nets_carry_a_season():
     b = _schedule_at(datetime(2026, 9, 28, 23, 19, tzinfo=timezone.utc))["by_band"]
     assert b["160m"]["season"] == "winter" and b["80m Late"]["season"] == "winter"
     assert "season" not in b["20m"]
+
+
+# ---------------------------------------------------------------------------
+# Nets on air matched against OMISS's schedule (#11), statehood note
+# ---------------------------------------------------------------------------
+
+from datetime import date  # noqa: E402
+
+from omiss_mcp.omiss import match_schedule  # noqa: E402
+
+SCHEDULE = [
+    {"band": "20m", "time_utc": "18:30", "frequency_mhz": "14.290", "weekdays_utc": ["Mon", "Tue", "Wed", "Thu",
+     "Fri", "Sat", "Sun"], "window_low_mhz": "14.240", "window_high_mhz": "14.345"},
+    {"band": "80m Late", "time_utc": "05:00", "frequency_mhz": "3.950", "weekdays_utc": [],
+     "seasonal_utc": [{"weekdays": ["Sun"], "months": [10, 11, 12, 1, 2, 3]}]},
+]
+
+
+def live(mhz: float | None, opened: str, band: str | None = None) -> dict:
+    """A net as netlogger_active_nets returns it."""
+    return {"frequency": "" if mhz is None else f"{mhz:.3f}", "opened": opened, "band": band}
+
+
+def test_a_net_in_the_window_near_its_time_matches():
+    m = match_schedule(live(14.290, "2026-10-03T18:28:00Z"), SCHEDULE)
+    assert m["band"] == "20m" and m["time_utc"] == "18:30"
+
+
+def test_a_net_on_the_band_but_far_from_its_time_does_not():
+    assert match_schedule(live(14.300, "2026-10-03T23:59:00Z"), SCHEDULE) is None
+
+
+def test_a_net_outside_the_window_does_not():
+    assert match_schedule(live(14.100, "2026-10-03T18:30:00Z"), SCHEDULE) is None
+
+
+def test_a_net_opened_before_midnight_matches_the_next_days_slot():
+    # Saturday 23:30 UTC is far too early for Sunday's 05:00.
+    assert match_schedule(live(3.950, "2026-10-03T23:30:00Z", "80m"), SCHEDULE) is None
+    # Sunday 04:58 UTC, in October: the seasonal 80m Late net.
+    assert match_schedule(live(3.950, "2026-10-04T04:58:00Z", "80m"), SCHEDULE)["band"] == "80m Late"
+    # The same net in July is out of season.
+    assert match_schedule(live(3.950, "2026-07-05T04:58:00Z", "80m"), SCHEDULE) is None
+
+
+def test_without_a_frequency_the_band_decides():
+    assert match_schedule(live(None, "2026-10-03T18:30:00Z", "20m"), SCHEDULE)["band"] == "20m"
+    assert match_schedule(live(None, "2026-10-03T18:30:00Z", "40m"), SCHEDULE) is None
+
+
+def test_unreadable_times_do_not_match():
+    assert match_schedule(live(14.290, "yesterday"), SCHEDULE) is None
+    assert match_schedule(live(None, "2026-10-03T18:30:00Z"), SCHEDULE) is None  # no frequency, no band
+
+
+def _source_with(sample: str) -> OmissSource:
+    body = files("omiss_mcp.samples").joinpath(sample).read_bytes()
+    return OmissSource(fetch=lambda url: (200, body, None), limiter=RateLimiter(LIMITS, window=0.0))
+
+
+def test_statehood_says_when_the_schedule_has_ended():
+    source = _source_with("statehoodSchedule.html")
+    r = source.statehood_schedule(today=date(2099, 1, 1))
+    assert r["next"] is None and "ends on" in r["note"]
+    r = source.statehood_schedule(today=date(2000, 1, 1))
+    assert r["next"] and "note" not in r

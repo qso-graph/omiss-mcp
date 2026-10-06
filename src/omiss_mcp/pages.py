@@ -645,3 +645,111 @@ def net_statistics(page: str) -> dict[str, Any]:
         "leaderboards": boards,
         "last_checkin_by_state": by_state,
     }
+
+
+# ---------------------------------------------------------------------------
+# Rosters (rosters.php): who is eligible for what, by callsign (#12)
+#
+# Each roster is read whole (once a day, cached) but only ever answered per
+# callsign: the lists are never returned in bulk, and nothing here is an address.
+# The rosters are typed by hand on omiss.net, so callsigns are cleaned before
+# they are matched ("WB0ESY." and "W7TEN " are WB0ESY and W7TEN).
+# ---------------------------------------------------------------------------
+
+_ROSTER_CALL_RE = re.compile(r"[A-Z0-9/]+")
+
+
+def roster_call(value: str) -> tuple[str, bool]:
+    """A roster's callsign, cleaned, and whether it is marked Silent Key."""
+    call, sk = _silent_key(value or "")
+    m = _ROSTER_CALL_RE.search(call.upper())
+    return (m.group(0) if m else ""), sk
+
+
+def roster_members(page: str) -> dict[str, dict[str, Any]]:
+    """rosterXML.php: every member, by callsign: OM number, first name, state."""
+    import defusedxml.ElementTree as SafeET
+
+    try:
+        root = SafeET.fromstring(page.encode("utf-8"))
+    except Exception as e:  # malformed, or refused by defusedxml
+        raise PageChanged("the member roster") from e
+    if root.tag != "OMISSRoster":
+        raise PageChanged("the member roster")
+    out: dict[str, dict[str, Any]] = {}
+    for m in root.iter("Member"):
+        call, sk = roster_call(m.findtext("Call") or "")
+        om = _int(m.findtext("OMNum") or "")
+        if not call or om is None:
+            continue
+        out[call] = _drop_empty({
+            "om_number": om,
+            "first_name": (m.findtext("FirstName") or "").strip(),
+            "state": (m.findtext("State") or "").strip(),
+            "silent_key": True if sk else None,
+        })
+    if not out:
+        raise PageChanged("the member roster")
+    return out
+
+
+def military_roster(page: str) -> dict[str, list[dict[str, Any]]]:
+    """militaryRoster.php: service by callsign (a member may list several)."""
+    rows = find_table(main_content(page), ["OM #", "Call", "Name", "Branch", "Dates", "Award Code"],
+                      "the military roster")
+    out: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        if len(row) < 6:
+            continue
+        call, _ = roster_call(row[1])
+        if not call or _int(row[0]) in (None, 0):
+            continue
+        out.setdefault(call, []).append(_drop_empty({
+            "branch": one_line(row[3]), "dates": one_line(row[4]), "award_code": one_line(row[5])}))
+    return out
+
+
+def first_responder_roster(page: str) -> dict[str, dict[str, Any]]:
+    """firstResponderRoster.php: roles (D, E, F, P, R) and status by callsign."""
+    header = ["OM #", "Call", "Name", "D", "E", "F", "P", "R", "Status"]
+    rows = find_table(main_content(page), header, "the first responder roster")
+    out: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if len(row) < 9:
+            continue
+        call, _ = roster_call(row[1])
+        if not call or _int(row[0]) in (None, 0):
+            continue  # OM 0 rows are open positions, not members
+        codes = [c for c, cell in zip("DEFPR", row[3:8]) if one_line(cell).upper() == c]
+        out[call] = _drop_empty({
+            "roles": [{"code": c, "role": FIRST_RESPONDER[c]} for c in codes],
+            "status": one_line(row[8]),
+        })
+    return out
+
+
+def state_capital_roster(page: str) -> dict[str, dict[str, Any]]:
+    """stateCapitalRoster.php: members whose station is inside a state capital."""
+    rows = find_table(main_content(page), ["OM #", "Call", "Name", "State"], "the State Capital roster")
+    out: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if len(row) < 4:
+            continue
+        call, _ = roster_call(row[1])
+        if not call or _int(row[0]) in (None, 0):
+            continue
+        out[call] = _drop_empty({"state": one_line(row[3])})
+    return out
+
+
+def silent_key_roster(page: str) -> set[str]:
+    """SKRoster.php: callsigns of Silent Keys."""
+    rows = find_table(main_content(page), ["OM #", "Call", "Name"], "the Silent Key roster")
+    out: set[str] = set()
+    for row in rows:
+        if len(row) < 2:
+            continue
+        call, _ = roster_call(row[1])
+        if call:
+            out.add(call)
+    return out

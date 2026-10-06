@@ -624,6 +624,10 @@
           "items": {
             "$ref": "#/$defs/statehood_date"
           }
+        },
+        "note": {
+          "type": "string",
+          "description": "Why there is no next date: omiss.net's published schedule has ended"
         }
       },
       "required": [
@@ -849,6 +853,113 @@
         "nets_per_band",
         "last_net_per_band",
         "leaderboards"
+      ]
+    },
+    "eligibility_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "callsign": {
+          "$ref": "#/$defs/callsign"
+        },
+        "member": {
+          "type": "boolean",
+          "description": "On OMISS's member roster"
+        },
+        "om_number": {
+          "$ref": "#/$defs/om_number"
+        },
+        "first_name": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "silent_key": {
+          "const": true
+        },
+        "military": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "branch": {
+                "type": "string"
+              },
+              "dates": {
+                "type": "string"
+              },
+              "award_code": {
+                "type": "string",
+                "description": "As the military roster states it (e.g. MIL:N); never checked against a closed list"
+              }
+            }
+          }
+        },
+        "first_responder": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "roles": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "D, E, F, P or R, as the roster states it"
+                  },
+                  "role": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code"
+                ]
+              }
+            },
+            "status": {
+              "type": "string"
+            }
+          }
+        },
+        "state_capital": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "required": [
+        "callsign",
+        "member"
+      ]
+    },
+    "eligibility": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/freshness"
+        }
+      ],
+      "properties": {
+        "source": {
+          "const": "omiss"
+        },
+        "callsigns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/eligibility_record"
+          }
+        }
+      },
+      "required": [
+        "source",
+        "callsigns"
       ]
     }
   }

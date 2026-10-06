@@ -21,7 +21,7 @@ TOOLS = {
     "get_version_info", "omiss_net_schedule", "omiss_nets_on_air", "omiss_set_callsign",
     "omiss_member_lookup", "omiss_checkin_history", "omiss_net_checkins",
     "omiss_statehood_schedule", "omiss_officers", "omiss_awards", "omiss_award_rules",
-    "omiss_award_recipients", "omiss_net_statistics",
+    "omiss_award_recipients", "omiss_net_statistics", "omiss_eligibility",
 }
 
 SCHEMA = json.loads(files("omiss_mcp.schema").joinpath("contract.schema.json").read_text())
@@ -58,7 +58,7 @@ def test_tool_list():
 
 def test_version_info():
     r = call("get_version_info")
-    assert r["service_name"] == "omiss-mcp" and r["contract_version"] == "0.2"
+    assert r["service_name"] == "omiss-mcp" and r["contract_version"] == "0.3"
 
 
 def test_schedule():
@@ -118,7 +118,36 @@ def test_nets_on_air_needs_a_callsign_once():
     assert "error" in call("omiss_set_callsign", {"callsign": "not a call"})
     assert call("omiss_set_callsign", {"callsign": "ki7mt"}) == {"callsign": "KI7MT", "saved": True}
     r = call("omiss_nets_on_air")
-    assert r["nets"] and all("OMISS" in n["name"] for n in r["nets"])
+    nets = {n["name"]: n for n in r["nets"]}
+    assert set(nets) == {"OMISS 20m SSB Net", "Sideband Saturday", "OMISS Informal Net"}
+    assert r["total"] == 3
+    assert nets["OMISS 20m SSB Net"]["matched_by"] == ["schedule", "name"]
+    assert nets["OMISS 20m SSB Net"]["omiss_net"]["band"] == "20m"
+    # an OMISS net logged under a name without "OMISS", found by the schedule (#11)
+    assert nets["Sideband Saturday"]["matched_by"] == ["schedule"]
+    assert nets["Sideband Saturday"]["omiss_net"]["band"] == "80m Late"
+    assert nets["OMISS Informal Net"]["matched_by"] == ["name"]
+    assert "omiss_net" not in nets["OMISS Informal Net"]
+
+
+def test_eligibility():
+    r = valid(call("omiss_eligibility", {"callsigns": ["w1oms", "W2XBB", "W3XCC", "KX0AA", "N0NE", "W1OMS"]}),
+              "eligibility")
+    by = {c["callsign"]: c for c in r["callsigns"]}
+    assert list(by) == ["W1OMS", "W2XBB", "W3XCC", "KX0AA", "N0NE"]  # in order, once each
+    w1 = by["W1OMS"]
+    assert w1["member"] and w1["om_number"] == 999
+    assert [m["branch"] for m in w1["military"]] == ["USN", "USNR"]
+    assert {x["code"] for x in w1["first_responder"]["roles"]} == {"E", "F"}
+    assert by["W2XBB"]["state_capital"] == {"state": "RI"}
+    assert by["W3XCC"]["om_number"] == 1003  # the roster's "W3XCC." still matches
+    assert by["KX0AA"]["silent_key"] is True
+    assert by["N0NE"] == {"callsign": "N0NE", "member": False}
+    for bad in ([], ["not a call"], ["W1OMS"] * 0 + [f"W{i}AA" for i in range(201)]):
+        assert "error" in call("omiss_eligibility", {"callsigns": bad})
+    out = json.dumps(r)
+    assert "FN31" not in out and "HARTFORD" not in out  # grid and county are not returned
+
 
 
 def test_errors_carry_as_of():

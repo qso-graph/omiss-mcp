@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## 0.1.7 (2026-10-06)
 
 - **Nets on air are matched to OMISS's own schedule** (#11). `omiss_nets_on_air` used to keep only
   nets with "OMISS" in their name, so an OMISS net logged under another name was missed. A net now

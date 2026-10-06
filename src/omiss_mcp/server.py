@@ -17,7 +17,7 @@ from netlogger_mcp.netlogger import NetLoggerError, NetLoggerSource
 
 from . import __contract_version__, __spec_version__, __version__
 from .html import OmissError
-from .omiss import LIMITS, OmissSource
+from .omiss import LIMITS, OmissSource, match_schedule
 
 mcp = FastMCP(
     "omiss-mcp",
@@ -26,7 +26,7 @@ mcp = FastMCP(
         "OMISS (Old Man International Sideband Society): the net schedule and holidays, "
         "OMISS nets on the air now, member lookup by callsign or OM number, past nets and "
         "who checked in, the 40m Statehood schedule, officers, awards and their rules and "
-        "recipients, and net statistics. Read-only, from omiss.net's public pages, which "
+        "recipients, net statistics, and award eligibility for a list of callsigns. Read-only, from omiss.net's public pages, which "
         "are read slowly and cached (see age_seconds). Past nets come from "
         "omiss_checkin_history, which gives the net_id omiss_net_checkins needs; award IDs "
         "come from omiss_awards. omiss_nets_on_air asks NetLogger, which needs the user's "
@@ -51,6 +51,11 @@ _SAMPLES = {
     "awardRules.php": "awardRules.html",
     "GenAwardReport.php": "GenAwardReport.html",
     "statistics.php": "statistics.html",
+    "rosterXML.php": "rosterXML.xml",
+    "militaryRoster.php": "militaryRoster.html",
+    "firstResponderRoster.php": "firstResponderRoster.html",
+    "stateCapitalRoster.php": "stateCapitalRoster.html",
+    "SKRoster.php": "SKRoster.html",
 }
 
 
@@ -68,8 +73,10 @@ def _mock_fetch(url: str) -> tuple[int, bytes, str | None]:
 
 
 def _mock_netlogger_fetch(url: str) -> tuple[int, bytes, str | None]:
+    # omiss-mcp's own NetLogger sample, so mock mode doesn't depend on what
+    # netlogger-mcp happens to bundle (its samples changed in 0.1.6).
     routine = urllib.parse.urlparse(url).path.rsplit("/", 1)[-1].removesuffix(".php")
-    return 200, files("netlogger_mcp.samples").joinpath(f"{routine}.xml").read_bytes(), None
+    return 200, files("omiss_mcp.samples").joinpath(f"netlogger_{routine}.xml").read_bytes(), None
 
 
 _source: OmissSource | None = None
@@ -150,12 +157,18 @@ def omiss_net_schedule() -> dict[str, Any]:
 
 @mcp.tool()
 def omiss_nets_on_air() -> dict[str, Any]:
-    """List OMISS nets on the air now, from NetLogger.
+    """List OMISS nets on the air now, from NetLogger, each matched to OMISS's own net
+    schedule.
+
+    A net on NetLogger is an OMISS net when it matches a scheduled one (its frequency
+    is in that net's window, on a day it runs, near its start time) or its name says
+    OMISS. Each says which scheduled net it is.
 
     Returns:
         as_of_utc, and nets with server, name, frequency, band, mode, net control,
-        when opened and how many are monitoring. servers counts every net NetLogger
-        listed on each server, before the OMISS filter.
+        when opened, how many are monitoring, matched_by (schedule, name) and
+        omiss_net (the scheduled net: band, time, frequency, coordinator). servers
+        counts every net NetLogger listed on each server, before the OMISS filter.
     """
     global _netlogger
     try:
@@ -169,7 +182,27 @@ def omiss_nets_on_air() -> dict[str, Any]:
                                              limiter=RateLimiter(NETLOGGER_LIMITS), cache=Cache())
             else:
                 _netlogger = NetLoggerSource(callsign, "omiss-mcp", __version__)
-        return {"as_of_utc": _as_of(), **_netlogger.active_nets(name_like="OMISS")}
+        live = _netlogger.active_nets(name_like="")
+        note = None
+        try:
+            schedule = _get_source().net_schedule()["nets"]
+        except OmissError:
+            schedule, note = [], "OMISS's schedule couldn't be read; matched by name only"
+        nets = []
+        for net in live.get("nets", []):
+            by = []
+            scheduled = match_schedule(net, schedule)
+            if scheduled:
+                by.append("schedule")
+            names = f"{net.get('name', '')} {net.get('current_name', '')}".upper()
+            if "OMISS" in names:
+                by.append("name")
+            if by:
+                nets.append({**net, "matched_by": by, **({"omiss_net": scheduled} if scheduled else {})})
+        result = {"as_of_utc": _as_of(), **live, "total": len(nets), "nets": nets}
+        if note:
+            result["note"] = note
+        return result
     except NetLoggerError as e:
         return {"error": str(e), "as_of_utc": _as_of()}
     except Exception:
@@ -255,6 +288,27 @@ def omiss_net_checkins(net_id: int) -> dict[str, Any]:
         status, QSL info and OM number.
     """
     return _run("net_checkins", net_id)
+
+
+@mcp.tool()
+def omiss_eligibility(callsigns: list[str]) -> dict[str, Any]:
+    """For stations on a net: is each an OMISS member, and which award categories
+    does it count for? From omiss.net's own rosters.
+
+    Use it with a net's check-ins (netlogger-mcp's netlogger_checkins for a live
+    net, or omiss_net_checkins for a past one) to see who you still need. Only the
+    callsigns asked about are answered.
+
+    Args:
+        callsigns: Up to 200 callsigns (e.g. ["KI7MT", "W4DWS"]).
+
+    Returns:
+        callsigns, each with member (true/false), om_number, first_name, state,
+        silent_key, military (branch, dates, award_code for each period of service),
+        first_responder (roles with codes D/E/F/P/R, status) and state_capital
+        (state), each only when the rosters list it.
+    """
+    return _run("eligibility", callsigns)
 
 
 @mcp.tool()

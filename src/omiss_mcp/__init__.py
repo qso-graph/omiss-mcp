@@ -17,4 +17,4 @@ __version__: Final[str] = _pkg_version
 __spec_version__: Final[str] = "omiss.net-facelift-2026-09"
 
 # Version of the records the tools return (schema/contract.schema.json).
-__contract_version__: Final[str] = "0.2"
+__contract_version__: Final[str] = "0.3"

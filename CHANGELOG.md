@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- PyPI: the Documentation link goes to this package's own page, https://qso-graph.io/servers/omiss-mcp/ (qso-graph/.github#15).
+
 ## 0.1.7 (2026-10-06)
 
 - **Nets on air are matched to OMISS's own schedule** (#11). `omiss_nets_on_air` used to keep only

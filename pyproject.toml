@@ -33,6 +33,7 @@ test = ["pytest", "jsonschema"]
 
 [project.urls]
 Homepage = "https://qso-graph.io"
+Documentation = "https://qso-graph.io/servers/omiss-mcp/"
 Repository = "https://github.com/qso-graph/omiss-mcp"
 Issues = "https://github.com/qso-graph/omiss-mcp/issues"
 

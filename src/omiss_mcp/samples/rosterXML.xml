@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic sample of omiss.net/Facelift/rosterXML.php for OMISS_MCP_MOCK=1: the real element
+     names, made-up members. "W3XCC." keeps a stray character, as the real roster sometimes does. -->
+<OMISSRoster>
+ <Header>
+  <CreationDateUTC>Sat 10/03/2026 18:00:00</CreationDateUTC>
+ </Header>
+ <Member><OMNum>14</OMNum><Call>KX0AA</Call><FirstName>JOHN</FirstName><State>MN</State><Grid>EN34</Grid><County>HENNEPIN</County></Member>
+ <Member><OMNum>999</OMNum><Call>W1OMS</Call><FirstName>OSCAR</FirstName><State>CT</State><Grid>FN31</Grid><County>HARTFORD</County></Member>
+ <Member><OMNum>1002</OMNum><Call>W2XBB</Call><FirstName>BOB</FirstName><State>RI</State><Grid>FN41</Grid><County>PROVIDENCE</County></Member>
+ <Member><OMNum>1003</OMNum><Call>W3XCC.</Call><FirstName>CAROL</FirstName><State>PA</State><Grid>FN20</Grid><County>CHESTER</County></Member>
+</OMISSRoster>

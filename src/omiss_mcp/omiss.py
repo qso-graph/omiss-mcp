@@ -58,7 +58,14 @@ TTL = {
     "rules": 7 * DAY,
     "recipients": DAY,
     "statistics": HOUR,
+    "roster": DAY,
+    "military": DAY,
+    "first_responder": DAY,
+    "state_capital": DAY,
+    "silent_keys": DAY,
 }
+
+MAX_ELIGIBILITY_CALLS = 200  # a big net's check-in list, with room to spare
 
 _CALLSIGN_RE = re.compile(r"(?=.*[A-Z])(?=.*[0-9])[A-Z0-9/]{3,20}")
 _DATE_RE = re.compile(r"(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?")
@@ -202,6 +209,83 @@ def next_run(net: dict[str, Any], holidays: set[str], now: datetime) -> dict[str
         if when > start:
             return {"next_utc": when.strftime("%Y-%m-%dT%H:%M:%SZ"), "next_is_holiday": holiday}
     return {"next_utc_note": f"doesn't run in the next {LOOKAHEAD_DAYS} days"}
+
+
+# ---------------------------------------------------------------------------
+# Is a net on the air one of OMISS's? Match it to the published schedule (#11)
+# ---------------------------------------------------------------------------
+
+_WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+OPENS_EARLY_MIN = 60   # a net may open this long before its scheduled start
+OPENS_LATE_MIN = 120   # ... or this long after it
+
+
+def _runs_on(net: dict[str, Any], day: date) -> bool:
+    """Does the scheduled net run on this UTC date?"""
+    wd = _WEEKDAYS[day.weekday()]
+    if wd in (net.get("weekdays_utc") or []):
+        return True
+    return any(wd in (s.get("weekdays") or []) and day.month in (s.get("months") or [])
+               for s in net.get("seasonal_utc") or [])
+
+
+def _in_window(net: dict[str, Any], mhz: float | None, band_: str | None) -> bool:
+    """The live net's frequency is inside the scheduled window; or, with no readable
+    frequency, it is on the scheduled band."""
+    try:
+        low, high = float(net["window_low_mhz"]), float(net["window_high_mhz"])
+    except (KeyError, TypeError, ValueError):
+        low = high = None
+    if mhz is not None and low is not None:
+        return low <= mhz <= high
+    sched_band = (net.get("band") or "").split()[0].lower()
+    return bool(band_) and band_.lower() == sched_band
+
+
+def match_schedule(live: dict[str, Any], schedule: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The scheduled OMISS net a live NetLogger net is, or None.
+
+    It matches when its frequency is inside the net's published window (or, without a
+    frequency, it is on the net's band), and it opened on a day the net runs, between
+    OPENS_EARLY_MIN before and OPENS_LATE_MIN after the scheduled start. The closest
+    start wins."""
+    opened = live.get("opened") or ""
+    try:
+        when = datetime.strptime(opened, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    try:
+        mhz: float | None = float(live.get("frequency") or "")
+    except ValueError:
+        mhz = None
+    best: tuple[float, dict[str, Any]] | None = None
+    for net in schedule:
+        if not _in_window(net, mhz, live.get("band")):
+            continue
+        try:
+            h, m = (int(x) for x in (net.get("time_utc") or "").split(":"))
+        except ValueError:
+            continue
+        for day in (when.date() - timedelta(days=1), when.date(), when.date() + timedelta(days=1)):
+            if not _runs_on(net, day):
+                continue
+            start = datetime(day.year, day.month, day.day, h, m, tzinfo=timezone.utc)
+            minutes = (when - start).total_seconds() / 60
+            if -OPENS_EARLY_MIN <= minutes <= OPENS_LATE_MIN and (best is None or abs(minutes) < best[0]):
+                best = (abs(minutes), net)
+    if best is None:
+        return None
+    net = best[1]
+    return _drop_empty_keys({
+        "band": net.get("band"),
+        "time_utc": net.get("time_utc"),
+        "frequency_mhz": net.get("frequency_mhz"),
+        "coordinator": net.get("coordinator"),
+    })
+
+
+def _drop_empty_keys(rec: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in rec.items() if v not in (None, "", [], {})}
 
 
 # ---------------------------------------------------------------------------
@@ -400,7 +484,49 @@ class OmissSource:
         rows, info = self._page("statehood", "statehoodSchedule.php", {}, pages.statehood_schedule)
         today = today or self._now().date()
         upcoming = [r for r in rows if r["date"] >= today.isoformat()]
-        return {"source": SOURCE, "next": upcoming[0] if upcoming else None, "schedule": rows, **info}
+        result = {"source": SOURCE, "next": upcoming[0] if upcoming else None, "schedule": rows, **info}
+        if not upcoming:
+            last = rows[-1]["date"] if rows else None
+            result["note"] = (f"omiss.net's published Statehood schedule ends on {last}; no later dates "
+                              "are posted yet" if last else "omiss.net has no Statehood dates posted")
+        return result
+
+    def eligibility(self, callsigns: list[str] | str) -> dict[str, Any]:
+        """For each callsign asked about: OMISS membership and the award categories
+        it counts for (military service, first responder roles, State Capital, Silent
+        Key), from omiss.net's own rosters (#12).
+
+        Each roster is read once a day and cached; only the callsigns asked about are
+        answered, never the lists. Categories are reported as the rosters state them,
+        never checked against a closed list."""
+        if isinstance(callsigns, str):
+            callsigns = [c for c in re.split(r"[\s,]+", callsigns) if c]
+        calls = list(dict.fromkeys(normalize_callsign(c) for c in callsigns))
+        if not calls:
+            raise OmissError("give at least one callsign")
+        if len(calls) > MAX_ELIGIBILITY_CALLS:
+            raise OmissError(f"at most {MAX_ELIGIBILITY_CALLS} callsigns at a time")
+        members, info = self._page("roster", "rosterXML.php", {}, pages.roster_members)
+        military, _ = self._page("military", "militaryRoster.php", {}, pages.military_roster)
+        responders, _ = self._page("first_responder", "firstResponderRoster.php", {}, pages.first_responder_roster)
+        capitals, _ = self._page("state_capital", "stateCapitalRoster.php", {}, pages.state_capital_roster)
+        silent, _ = self._page("silent_keys", "SKRoster.php", {}, pages.silent_key_roster)
+        out = []
+        for call in calls:
+            member = members.get(call)
+            rec: dict[str, Any] = {"callsign": call, "member": member is not None}
+            if member:
+                rec.update(member)
+            if call in silent:
+                rec["silent_key"] = True
+            if call in military:
+                rec["military"] = military[call]
+            if call in responders:
+                rec["first_responder"] = responders[call]
+            if call in capitals:
+                rec["state_capital"] = capitals[call]
+            out.append(rec)
+        return {"source": SOURCE, "callsigns": out, **info}
 
     def officers(self) -> dict[str, Any]:
         """Officers, band coordinators, committees, appointees and other VIPs."""

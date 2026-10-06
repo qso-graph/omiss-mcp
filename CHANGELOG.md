@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+- **Nets on air are matched to OMISS's own schedule** (#11). `omiss_nets_on_air` used to keep only
+  nets with "OMISS" in their name, so an OMISS net logged under another name was missed. A net now
+  counts when its frequency is inside a scheduled net's window, on a day that net runs, from an hour
+  before to two hours after its start; or when its name says OMISS. Each net says how it matched
+  (`matched_by`) and which scheduled net it is (`omiss_net`). If the schedule can't be read, it
+  falls back to the name, with a note.
+- **New tool `omiss_eligibility`** (#12). Give it a net's check-ins (from `netlogger_checkins` or
+  `omiss_net_checkins`) and it says, per callsign, whether they are an OMISS member, their OM number
+  and state, whether they are a silent key, and their entries on OMISS's military, first responder
+  and state capital rosters, all from omiss.net's public rosters (read once a day). Up to 200
+  callsigns per call. Grid and county are on the roster but not returned.
+- `omiss_statehood_schedule` says why `next` is empty: omiss.net's published schedule has ended.
+- Contract version 0.3.
+
 - CI: the release flow (qso-graph/.github TEMPLATES.md). Work lands on `develop`; a release is a
   PR from `develop` into `main`, and merging it publishes to PyPI and the MCP Registry, verifies both
   and tags the release. CI runs on `develop` too, and PRs into `main` must come from `develop` or a

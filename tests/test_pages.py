@@ -125,7 +125,8 @@ def test_statistics():
 @pytest.mark.parametrize("parser", [
     pages.net_schedule, pages.members, pages.checkin_history, pages.net_checkins,
     pages.statehood_schedule, pages.officers, pages.awards, pages.award_rules,
-    pages.award_recipients, pages.net_statistics,
+    pages.award_recipients, pages.net_statistics, pages.roster_members, pages.military_roster,
+    pages.first_responder_roster, pages.state_capital_roster, pages.silent_key_roster,
 ])
 def test_a_changed_page_is_reported_not_guessed(parser):
     with pytest.raises(PageChanged):
@@ -188,3 +189,23 @@ def test_award_id_naming_two_awards_fails_loudly():
     with pytest.raises(pages.PageChanged):
         pages.awards(page)
 
+
+
+def test_rosters():
+    m = pages.roster_members(sample("rosterXML.xml"))
+    assert m["W1OMS"] == {"om_number": 999, "first_name": "OSCAR", "state": "CT"}
+    assert m["W3XCC"]["om_number"] == 1003  # "W3XCC." on the page
+    assert all("grid" not in v and "county" not in v for v in m.values())
+    mil = pages.military_roster(sample("militaryRoster.html"))
+    assert [p["branch"] for p in mil["W1OMS"]] == ["USN", "USNR"]
+    assert "KX0AA" in mil  # "KX0AA_(SK)" on the page
+    fr = pages.first_responder_roster(sample("firstResponderRoster.html"))
+    assert "NONE" not in fr and len(fr) == 2  # OM 0, an open position, is skipped
+    assert fr["W2XBB"]["status"] == "Active"
+    assert pages.state_capital_roster(sample("stateCapitalRoster.html")) == {"W2XBB": {"state": "RI"}}
+    assert pages.silent_key_roster(sample("SKRoster.html")) == {"KX0AA"}
+
+
+def test_roster_call_cleans_and_flags():
+    assert pages.roster_call("W3XCC.") == ("W3XCC", False)
+    assert pages.roster_call(" kx0aa_(SK) ") == ("KX0AA", True)

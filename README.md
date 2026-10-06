@@ -19,7 +19,7 @@ uvx omiss-mcp            # run it; nothing to install
 | Tool | Description | Key Parameters |
 |------|-------------|----------------|
 | `omiss_net_schedule` | Every net's band, UTC time, frequency, days, band coordinator and next run; holiday dates | — |
-| `omiss_nets_on_air` | OMISS nets on the air now, from NetLogger | — |
+| `omiss_nets_on_air` | OMISS nets on the air now, from NetLogger, each matched to the net schedule | — |
 | `omiss_member_lookup` | One member: OM number, call, name, status, grid, state, county, last check-in | callsign or om_number |
 | `omiss_checkin_history` | Past nets, newest first, optionally only a member's, a band's or a date's | callsign, om_number, band, date, net_control |
 | `omiss_net_checkins` | One past net: net control, relays, notes, and the check-in list | net_id |
@@ -29,6 +29,7 @@ uvx omiss-mcp            # run it; nothing to install
 | `omiss_award_rules` | An award's rules, or every award's summary | award_id |
 | `omiss_award_recipients` | Who holds an award, newest first, or check one member | award_id, callsign, om_number |
 | `omiss_net_statistics` | Nets per band, last net per band, top check-ins and net controls, last check-in by state | state, top |
+| `omiss_eligibility` | For a list of callsigns (a net's check-ins): member or not, OM number, silent key, and the military, first responder and state capital rosters | callsigns |
 | `omiss_set_callsign` | Save your callsign, for `omiss_nets_on_air` (asked once) | callsign |
 | `get_version_info` | Service version + upstream spec version (fleet identity attestation) | — |
 

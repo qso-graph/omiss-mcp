@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+- CI: the release flow (qso-graph/.github TEMPLATES.md). Work lands on `develop`; a release is a
+  PR from `develop` into `main`, and merging it publishes to PyPI and the MCP Registry, verifies both
+  and tags the release. CI runs on `develop` too, and PRs into `main` must come from `develop` or a
+  `security/` branch.
+
 ## 0.1.6 (2026-10-06)
 
 - **Hyphenated award IDs were cut short** (#17). omiss.net has eight: `WAS-KN4OM`, `MIL-1ST-RESP`,

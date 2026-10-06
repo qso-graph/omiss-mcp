@@ -6,12 +6,12 @@
     "url": "https://github.com/qso-graph/omiss-mcp",
     "source": "github"
   },
-  "version": "0.1.5",
+  "version": "0.1.6",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "omiss-mcp",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "transport": { "type": "stdio" }
     }
   ],

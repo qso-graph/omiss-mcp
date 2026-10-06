@@ -1,7 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.1.6 (2026-10-06)
 
+- **Hyphenated award IDs were cut short** (#17). omiss.net has eight: `WAS-KN4OM`, `MIL-1ST-RESP`,
+  `PATRIOT-TOPOP`, `Patriot-NCSQTR`, and the retired `SLEEPY-RET`, `NCSMON-RET`, `NEALISMEMORIAL-RET` and
+  `Y2K-RET`. They were read up to the hyphen, so `WAS-KN4OM` (Worked the Club Call KN4OM in all States)
+  became `WAS` and collided with the basic WAS award. The award list now returns all 148 (it returned 140).
+- **The award list never drops an award silently.** A repeated link to the same award is still skipped;
+  an ID naming two different awards is now an error rather than a lost award (Watson).
 - Schema: `frequency_window` (and `window_low_mhz`/`window_high_mhz`) described as what it is: the
   net's legal operating range for its sideband, not a range it moves around in (Watson and Patton,
   checked across four bands).

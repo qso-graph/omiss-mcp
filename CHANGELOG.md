@@ -19,6 +19,9 @@
   widths, not defects, and some lines are long because they name a publisher's field exactly.
 - `mcp.run` is given the literal fastmcp asks for rather than a `str` that happens to hold the
   right word.
+- **The published contact is `maintainers@qso-graph.io`** (qso-graph-devel#69). The `authors` field
+  carried a personal address, and that field is what PyPI shows on the package page. The project
+  has had outside contributions; a project address is the fitting route for them.
 
 ## 0.1.9 (2026-10-07)
 

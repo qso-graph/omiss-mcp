@@ -7,7 +7,7 @@ license = {text = "GPL-3.0-or-later"}
 authors = [{name = "Greg Beam, KI7MT", email = "ki7mt@yahoo.com"}]
 requires-python = ">=3.10"
 dependencies = [
-    "fastmcp>=3.0",
+    "fastmcp>=4.0,<5",
     "netlogger-mcp>=0.1.2",
     "tzdata; sys_platform == 'win32'",  # the roster's US Eastern times; Windows has no zone data
 ]

@@ -5,8 +5,8 @@ from __future__ import annotations
 from importlib.resources import files
 
 import pytest
-
 from netlogger_mcp.limiter import Cache, RateLimiter, SharedRateLimiter
+
 from omiss_mcp import __version__
 from omiss_mcp.html import OmissError
 from omiss_mcp.omiss import LIMITS, SPACING, OmissSource, RateLimited, user_agent

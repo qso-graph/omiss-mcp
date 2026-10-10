@@ -9,10 +9,19 @@ from __future__ import annotations
 import html as _html
 import re
 from datetime import date, datetime, timezone
-from zoneinfo import ZoneInfo
 from typing import Any
+from zoneinfo import ZoneInfo
 
-from .html import PageChanged, clean, find_table, main_content, one_line, prepare, tables, text_of
+from .html import (
+    PageChanged,
+    clean,
+    find_table,
+    main_content,
+    one_line,
+    prepare,
+    tables,
+    text_of,
+)
 
 BANDS = ("10m", "12m", "15m", "17m", "20m", "40m", "80m", "160m")
 
@@ -192,7 +201,7 @@ def net_schedule(page: str) -> dict[str, Any]:
             if line:
                 day_lines.append(line)
         parts = [p.strip() for p in coord.split(",")]
-        coordinator = {}
+        coordinator: dict[str, Any] = {}
         if parts and parts[0]:
             coordinator["callsign"] = parts[0].upper()
         if len(parts) > 1 and parts[1]:
@@ -461,7 +470,7 @@ def officers(page: str) -> list[dict[str, Any]]:
                 people.append(_drop_empty(person | {"silent_key": True if sk else None, "note": clean(note)}))
             elif "OPEN POSITION" in line.upper():
                 when = re.match(r"^(\d{4})(?:-(\d{4}))?\s", line)
-                vacant = {"role": pending_role, "vacant": True}
+                vacant: dict[str, Any] = {"role": pending_role, "vacant": True}
                 if when and when.group(2):
                     vacant = {"term": f"{when.group(1)}-{when.group(2)}", "vacant": True}
                 elif when:
@@ -606,7 +615,8 @@ def net_statistics(page: str) -> dict[str, Any]:
     last = band_row("Last Net")
     if counts is None or last is None:
         raise PageChanged("the net statistics")
-    window = text_of(re.search(r"<h5>(.*?)</h5>", content, re.S | re.I).group(1)) if "<h5>" in content else ""
+    heading = re.search(r"<h5>(.*?)</h5>", content, re.S | re.I)
+    window = text_of(heading.group(1)) if heading else ""
     oldest = re.search(r"oldest entry date is:\s*(\S+ \S+)", window)
     newest = re.search(r"newest entry date is:\s*(\S+ \S+)", window)
 

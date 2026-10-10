@@ -90,8 +90,8 @@ import urllib.parse  # noqa: E402
 from importlib.resources import files  # noqa: E402
 
 import pytest  # noqa: E402
-
 from netlogger_mcp.limiter import RateLimiter  # noqa: E402
+
 from omiss_mcp.html import OmissError  # noqa: E402
 from omiss_mcp.omiss import LIMITS, OmissSource  # noqa: E402
 

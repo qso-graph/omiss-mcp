@@ -10,6 +10,7 @@ from __future__ import annotations
 import html
 import re
 from html.parser import HTMLParser
+from typing import Any
 
 
 class OmissError(Exception):
@@ -78,10 +79,10 @@ class _Tables(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.tables: list[list[list[str]]] = []
-        self._stack: list[dict] = []  # open tables
+        self._stack: list[dict[str, Any]] = []  # open tables
         self._skip = 0  # inside script/style
 
-    def handle_starttag(self, tag: str, attrs) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag in ("script", "style"):
             self._skip += 1
         elif tag == "table":
@@ -100,7 +101,7 @@ class _Tables(HTMLParser):
         elif tag == "br":
             self._text("\n")
 
-    def handle_startendtag(self, tag: str, attrs) -> None:
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag == "br":
             self._text("\n")
 

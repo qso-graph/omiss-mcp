@@ -99,9 +99,10 @@ def _as_of() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _run(method: str, *args) -> dict[str, Any]:
+def _run(method: str, *args: Any) -> dict[str, Any]:
     try:
-        return getattr(_get_source(), method)(*args)
+        answer: dict[str, Any] = getattr(_get_source(), method)(*args)
+        return answer
     except OmissError as e:
         return {"error": str(e), "as_of_utc": _as_of()}
     except Exception:
@@ -420,8 +421,10 @@ def main() -> None:
         if arg == "--port" and i < len(sys.argv) - 1:
             port = int(sys.argv[i + 1])
 
+    # Written out rather than passed through: fastmcp takes a literal, and a
+    # str that happens to hold the right word is not the same thing.
     if transport == "streamable-http":
-        mcp.run(transport=transport, port=port)
+        mcp.run(transport="streamable-http", port=port)
     else:
         mcp.run(transport="stdio")
 

@@ -232,14 +232,20 @@ def _runs_on(net: dict[str, Any], day: date) -> bool:
 def _in_window(net: dict[str, Any], mhz: float | None, band_: str | None) -> bool:
     """The live net's frequency is inside the scheduled window; or, with no readable
     frequency, it is on the scheduled band."""
+    low: float | None
+    high: float | None
     try:
         low, high = float(net["window_low_mhz"]), float(net["window_high_mhz"])
     except (KeyError, TypeError, ValueError):
         low = high = None
-    if mhz is not None and low is not None:
+    # Both ends are read separately, so neither one being there is proof of
+    # the other: a window with one end is no window.
+    if mhz is not None and low is not None and high is not None:
         return low <= mhz <= high
     sched_band = (net.get("band") or "").split()[0].lower()
-    return bool(band_) and band_.lower() == sched_band
+    if not band_:
+        return False
+    return band_.lower() == sched_band
 
 
 def match_schedule(live: dict[str, Any], schedule: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -343,7 +349,7 @@ class OmissSource:
         """Wait for our turn; return 0, or the seconds we've been told to back off."""
         waited = 0.0
         while True:
-            wait = self._limiter.try_acquire("omiss")
+            wait: float = self._limiter.try_acquire("omiss")
             if wait <= 0:
                 return 0.0
             if wait > MAX_SPACING_WAIT or waited + wait > MAX_SPACING_WAIT * 3:
@@ -543,7 +549,8 @@ class OmissSource:
         text = (value or "").strip()
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,31}", text):
             raise OmissError("award_id must be an ID from omiss_awards (e.g. ALPHABETSOUP)")
-        listed = {a["award_id"].upper(): a["award_id"] for a in self.awards()["awards"]}
+        listed: dict[str, str] = {a["award_id"].upper(): a["award_id"]
+                                  for a in self.awards()["awards"]}
         if text.upper() not in listed:
             raise OmissError(f"no OMISS award has the ID {text}; omiss_awards lists them")
         return listed[text.upper()]

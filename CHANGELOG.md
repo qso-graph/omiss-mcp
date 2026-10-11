@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.1.10 (2026-10-11)
+
+- **ruff and mypy run in CI** (qso-graph-devel#66), as a job the `ci-all-green` gate requires.
+  Settings follow `adif-mcp`, the reference for every qso-graph Python repo, rather than a style of
+  this repo's own. They run once rather than per Python version: both read the source, and neither
+  answer changes with the interpreter.
+- **`omiss_net_statistics` no longer raises on a page with an unclosed `<h5>`.** The window text was
+  read as `re.search(...).group(1)` behind a `"<h5>" in content` guard, and that guard does not
+  prove the pair matched: an opening tag with no closing one left the match `None` and the call
+  raised `AttributeError` instead of the `PageChanged` these parsers exist to raise. Found by mypy.
+- `_in_window` asks for both ends of a published frequency window before comparing against one. They
+  are read separately, so neither being present is proof of the other.
+- The table parser's two `HTMLParser` overrides name the attribute list they are handed, `_run`
+  types its `*args`, and the parsers' dicts say they hold mixed values rather than being inferred
+  from their first key.
+- `E501` is deferred rather than adopted (qso-graph-devel#70): what it reports in these repos are
+  widths, not defects, and some lines are long because they name a publisher's field exactly.
+- `mcp.run` is given the literal fastmcp asks for rather than a `str` that happens to hold the
+  right word.
+- **`fastmcp` is bounded: `>=4.0,<5`** (qso-graph-devel#60). It was `>=3.0` with no upper bound, and
+  these servers are run with `uvx`, which resolves fresh — so a `fastmcp` 5.0 would have reached
+  every user automatically, before anything here had been run against it. The floor rises to 4.0
+  because that is what is actually tested: every lock in the fleet held a 4.x, and nothing in CI
+  has ever exercised 3.x. A claim of 3.x support that no test backs is not support.
+- `fastmcp` is locked at 4.1.0, the current release, so CI runs against what a new install gets.
+- **The published contact is `maintainers@qso-graph.io`** (qso-graph-devel#69). The `authors` field
+  carried a personal address, and that field is what PyPI shows on the package page. Everything in
+  qso-graph is open source and open to contribution, so the contact is the project's.
+
 ## 0.1.9 (2026-10-07)
 
 - LICENSE: the full GPL-3.0 text. The file held only its opening and a link, so GitHub detected no licence.

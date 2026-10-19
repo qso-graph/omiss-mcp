@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (2026-10-19)
+
+The minor version moves because two things a caller may have relied on now behave
+differently.
 
 **Upgrading:** a tool that fails now returns `isError: true` instead of a successful result whose
 payload carried an `error` key. Anything reading `result["error"]` should read the error flag.
@@ -9,59 +12,20 @@ payload carried an `error` key. Anything reading `result["error"]` should read t
 `needs_callsign: true` and a `next_step`. It is now a flagged error whose message is the whole of
 that instruction — it still names `omiss_set_callsign` and still says exactly what to do.
 
-### Lint (#36, qso-graph-devel#70)
+### Release gate
 
-- **`E501` is adopted.** It reported **112 lines** — the most of any repo in this sweep — and
-  **not one of them was a defect**, which is the finding rather than an argument against
-  enforcing it. A consistent width is worth having; it just was never the thing holding the
-  quality, which is why the rules that do find defects (`F`, `I`, mypy strict) went in first.
-- **No line is exempt, and that was not the expectation.** The deferral note predicted that
-  publisher-field lines would need a `noqa`. In this repo none did: omiss.net's own strings — its
-  `GenAwardReport.php?AwardID=` links, its `<h3>` section titles (`King of the Hill`,
-  `NCS Total Nets`), its form field names (`Band`, `NCS`, `OMNum`, `Call`, …) and its table
-  headers (`Net Time & Frequency`, `40m Net Date`, `Certificate Number`) — all survive a reflow
-  **whole**, because the break goes at a concatenation boundary or a list comma rather than
-  through the literal. There is no `# noqa: E501` anywhere in the repo, and a check confirms it.
-- **Nothing moved on the wire.** Every tool's description and `inputSchema` was dumped through a
-  real client before and after: byte-identical. `--help` likewise, same SHA-256. (netlogger-mcp's
-  pass did change two parameter descriptions, because an `Args:` line was reflowed there; no
-  `Args:` line needed reflowing here.)
-- One reflow of mine produced `a or b if c else d`, which parses as `(a or b) if c else d` —
-  correct, but only to a reader who knows the precedence. It is spelled out as an `if`/`else`
-  instead, which is shorter as well as plainer.
-- Ruff's own `I001` fired once on `test_source.py` after the previous commit's import; fixed with
-  `--fix` rather than by hand.
-
-### TLS (#35, qso-graph-devel#73)
-
-- **`certifi` is carried, and the fetch verifies against it.** The one `urlopen` in `omiss.py`
-  passed no context, so it trusted whichever root store the running Python was built against. On
-  macOS that is `/etc/ssl/cert.pem`, a deliberately *reduced* OpenSSL-compatibility file: current,
-  not stale, but it omits roots the OS itself trusts, so a certificate chaining to one of them
-  fails for Python while `curl` to the same URL succeeds.
-- **Measured, not assumed:** `www.omiss.net` chains through Let's Encrypt's `YR2` to ISRG
-  `Root YR` and verifies against Apple's file and against `certifi` alike today. So this was
-  latent rather than an outage.
-- **`certifi` is declared directly, and this repo is the one where that needed an argument.**
-  Everywhere else in the fleet `certifi` is not transitive, so an undeclared import is an outright
-  ImportError. Here it *is* transitive — `netlogger-mcp` has carried it since 0.2.0 and this server
-  depends on netlogger-mcp. That makes the declaration easier to skip and no safer to skip:
-  measured 2026-10-18, `netlogger-mcp==0.1.10` — a resolution the floor `>=0.1.2` permits — pulls
-  no `certifi` at all. Without a direct declaration, whether this server verifies against a current
-  root set depends on which version of a sibling a user happens to resolve.
-- This server holds no credential — the one thing it stores is a callsign, which is public — so a
-  trust failure costs an answer rather than a secret. But it would cost it invisibly: the user is
-  told only that omiss.net couldn't be read, with nothing pointing at trust. Verification is never
-  disabled; `ssl.CERT_NONE` would make a call "work" by accepting any certificate from anyone.
-- Four static checks in `tests/test_security.py` (verification never disabled, the root set carried
-  not borrowed, `certifi` declared rather than inherited, every outbound call verifying) and **one
-  behavioural check** in `tests/test_source.py`. The behavioural one matters here more than
-  elsewhere: every other test in that file injects a `fetch` callable, so `_urllib_fetch` — the
-  only code that opens a socket — was never exercised at all. It now watches the context arrive at
-  `urlopen` and asks what it will do, because a grep cannot tell a verifying context from one built
-  with verification switched off. Falsified exactly that way, and it caught it.
-- Six falsifications in all, every one caught, including a second fetch path added with no context
-  — the shape lotw-mcp, qrz-mcp and eqsl-mcp each turned out to have.
+- **The `http://` check in `publish.yml` now tests its output rather than its exit status.**
+  `grep -v` given empty input exits **0** on macOS `/usr/bin/grep` and **1** on GNU grep, so the
+  old `if grep … | grep -v …; then FAIL` form reported a failure on a *clean* tree for anyone
+  running the gate locally on a Mac. It passed in CI only because the runner is ubuntu.
+- Noticed the way these things are: it failed during this release's own pre-release walk with
+  nothing wrong in `src/`. A gate that cannot be trusted off the runner is a gate nobody runs
+  before pushing.
+- Falsified three ways on macOS: a clean tree passes, a planted `http://www.omiss.net/…` fails
+  with the line printed, and the loopback exemption still holds.
+- The same construction is in 22 other repos' `publish.yml` plus `qrz-mcp`'s two-stage variant.
+  It is a false *positive* — it never lets a bad URL through — so no release has shipped wrong
+  because of it.
 
 ### MCP specification 2026-07-28 (#37)
 
@@ -101,6 +65,60 @@ that instruction — it still names `omiss_set_callsign` and still says exactly 
   breaking would fail the test rather than quietly pass), and a **refused** callsign leaves no file.
 - `as_of_utc` was on the error payloads as well as the successful ones. It is unchanged for a
   successful answer, which gets it from the source layer, and a test says so.
+
+### TLS (#35, qso-graph-devel#73)
+
+- **`certifi` is carried, and the fetch verifies against it.** The one `urlopen` in `omiss.py`
+  passed no context, so it trusted whichever root store the running Python was built against. On
+  macOS that is `/etc/ssl/cert.pem`, a deliberately *reduced* OpenSSL-compatibility file: current,
+  not stale, but it omits roots the OS itself trusts, so a certificate chaining to one of them
+  fails for Python while `curl` to the same URL succeeds.
+- **Measured, not assumed:** `www.omiss.net` chains through Let's Encrypt's `YR2` to ISRG
+  `Root YR` and verifies against Apple's file and against `certifi` alike today. So this was
+  latent rather than an outage.
+- **`certifi` is declared directly, and this repo is the one where that needed an argument.**
+  Everywhere else in the fleet `certifi` is not transitive, so an undeclared import is an outright
+  ImportError. Here it *is* transitive — `netlogger-mcp` has carried it since 0.2.0 and this server
+  depends on netlogger-mcp. That makes the declaration easier to skip and no safer to skip:
+  measured 2026-10-18, `netlogger-mcp==0.1.10` — a resolution the floor `>=0.1.2` permits — pulls
+  no `certifi` at all. Without a direct declaration, whether this server verifies against a current
+  root set depends on which version of a sibling a user happens to resolve.
+- This server holds no credential — the one thing it stores is a callsign, which is public — so a
+  trust failure costs an answer rather than a secret. But it would cost it invisibly: the user is
+  told only that omiss.net couldn't be read, with nothing pointing at trust. Verification is never
+  disabled; `ssl.CERT_NONE` would make a call "work" by accepting any certificate from anyone.
+- Four static checks in `tests/test_security.py` (verification never disabled, the root set carried
+  not borrowed, `certifi` declared rather than inherited, every outbound call verifying) and **one
+  behavioural check** in `tests/test_source.py`. The behavioural one matters here more than
+  elsewhere: every other test in that file injects a `fetch` callable, so `_urllib_fetch` — the
+  only code that opens a socket — was never exercised at all. It now watches the context arrive at
+  `urlopen` and asks what it will do, because a grep cannot tell a verifying context from one built
+  with verification switched off. Falsified exactly that way, and it caught it.
+- Six falsifications in all, every one caught, including a second fetch path added with no context
+  — the shape lotw-mcp, qrz-mcp and eqsl-mcp each turned out to have.
+
+### Lint (#36, qso-graph-devel#70)
+
+- **`E501` is adopted.** It reported **112 lines** — the most of any repo in this sweep — and
+  **not one of them was a defect**, which is the finding rather than an argument against
+  enforcing it. A consistent width is worth having; it just was never the thing holding the
+  quality, which is why the rules that do find defects (`F`, `I`, mypy strict) went in first.
+- **No line is exempt, and that was not the expectation.** The deferral note predicted that
+  publisher-field lines would need a `noqa`. In this repo none did: omiss.net's own strings — its
+  `GenAwardReport.php?AwardID=` links, its `<h3>` section titles (`King of the Hill`,
+  `NCS Total Nets`), its form field names (`Band`, `NCS`, `OMNum`, `Call`, …) and its table
+  headers (`Net Time & Frequency`, `40m Net Date`, `Certificate Number`) — all survive a reflow
+  **whole**, because the break goes at a concatenation boundary or a list comma rather than
+  through the literal. There is no `# noqa: E501` anywhere in the repo, and a check confirms it.
+- **Nothing moved on the wire.** Every tool's description and `inputSchema` was dumped through a
+  real client before and after: byte-identical. `--help` likewise, same SHA-256. (netlogger-mcp's
+  pass did change two parameter descriptions, because an `Args:` line was reflowed there; no
+  `Args:` line needed reflowing here.)
+- One reflow of mine produced `a or b if c else d`, which parses as `(a or b) if c else d` —
+  correct, but only to a reader who knows the precedence. It is spelled out as an `if`/`else`
+  instead, which is shorter as well as plainer.
+- Ruff's own `I001` fired once on `test_source.py` after the previous commit's import; fixed with
+  `--fix` rather than by hand.
 
 ## 0.1.10 (2026-10-11)
 

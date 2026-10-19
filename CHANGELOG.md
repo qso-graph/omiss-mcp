@@ -9,6 +9,37 @@ payload carried an `error` key. Anything reading `result["error"]` should read t
 `needs_callsign: true` and a `next_step`. It is now a flagged error whose message is the whole of
 that instruction — it still names `omiss_set_callsign` and still says exactly what to do.
 
+### TLS (#35, qso-graph-devel#73)
+
+- **`certifi` is carried, and the fetch verifies against it.** The one `urlopen` in `omiss.py`
+  passed no context, so it trusted whichever root store the running Python was built against. On
+  macOS that is `/etc/ssl/cert.pem`, a deliberately *reduced* OpenSSL-compatibility file: current,
+  not stale, but it omits roots the OS itself trusts, so a certificate chaining to one of them
+  fails for Python while `curl` to the same URL succeeds.
+- **Measured, not assumed:** `www.omiss.net` chains through Let's Encrypt's `YR2` to ISRG
+  `Root YR` and verifies against Apple's file and against `certifi` alike today. So this was
+  latent rather than an outage.
+- **`certifi` is declared directly, and this repo is the one where that needed an argument.**
+  Everywhere else in the fleet `certifi` is not transitive, so an undeclared import is an outright
+  ImportError. Here it *is* transitive — `netlogger-mcp` has carried it since 0.2.0 and this server
+  depends on netlogger-mcp. That makes the declaration easier to skip and no safer to skip:
+  measured 2026-10-18, `netlogger-mcp==0.1.10` — a resolution the floor `>=0.1.2` permits — pulls
+  no `certifi` at all. Without a direct declaration, whether this server verifies against a current
+  root set depends on which version of a sibling a user happens to resolve.
+- This server holds no credential — the one thing it stores is a callsign, which is public — so a
+  trust failure costs an answer rather than a secret. But it would cost it invisibly: the user is
+  told only that omiss.net couldn't be read, with nothing pointing at trust. Verification is never
+  disabled; `ssl.CERT_NONE` would make a call "work" by accepting any certificate from anyone.
+- Four static checks in `tests/test_security.py` (verification never disabled, the root set carried
+  not borrowed, `certifi` declared rather than inherited, every outbound call verifying) and **one
+  behavioural check** in `tests/test_source.py`. The behavioural one matters here more than
+  elsewhere: every other test in that file injects a `fetch` callable, so `_urllib_fetch` — the
+  only code that opens a socket — was never exercised at all. It now watches the context arrive at
+  `urlopen` and asks what it will do, because a grep cannot tell a verifying context from one built
+  with verification switched off. Falsified exactly that way, and it caught it.
+- Six falsifications in all, every one caught, including a second fetch path added with no context
+  — the shape lotw-mcp, qrz-mcp and eqsl-mcp each turned out to have.
+
 ### MCP specification 2026-07-28 (#37)
 
 - **Tool errors are flagged `isError`.** Seven error returns in `src/` arrived on the wire as

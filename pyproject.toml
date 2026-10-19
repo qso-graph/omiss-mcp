@@ -9,6 +9,13 @@ requires-python = ">=3.10"
 dependencies = [
     "fastmcp>=4.0,<5",
     "netlogger-mcp>=0.1.2",
+    # Declared directly rather than leaned on. netlogger-mcp has carried certifi since
+    # 0.2.0, so it arrives transitively today — but the floor above permits 0.1.x, and
+    # measured 2026-10-18, "netlogger-mcp==0.1.10" resolves with no certifi at all.
+    # Relying on a sibling's dependency is relying on somebody else's decision to keep
+    # it, and that the somebody else is us makes it tempting, not safer
+    # (qso-graph-devel#73).
+    "certifi",
     "tzdata; sys_platform == 'win32'",  # the roster's US Eastern times; Windows has no zone data
 ]
 keywords = [

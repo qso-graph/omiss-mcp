@@ -9,7 +9,14 @@ from netlogger_mcp.limiter import Cache, RateLimiter, SharedRateLimiter
 
 from omiss_mcp import __version__
 from omiss_mcp.html import OmissError
-from omiss_mcp.omiss import LIMITS, SPACING, OmissSource, RateLimited, user_agent
+from omiss_mcp.omiss import (
+    LIMITS,
+    SPACING,
+    OmissSource,
+    RateLimited,
+    _urllib_fetch,
+    user_agent,
+)
 
 
 class Clock:
@@ -241,3 +248,48 @@ def test_statehood_says_when_the_schedule_has_ended():
     assert r["next"] is None and "ends on" in r["note"]
     r = source.statehood_schedule(today=date(2000, 1, 1))
     assert r["next"] and "note" not in r
+
+
+class TestOutboundTLS:
+    """The real fetch path, which the rest of this file bypasses.
+
+    Every other test here injects a `fetch` callable, so `_urllib_fetch` — the only code
+    that actually opens a socket — is never exercised. test_security.py greps the call
+    for `context=_context()`, but a grep cannot tell a verifying context from one built
+    with verification switched off. This watches the object arrive and asks what it will
+    do.
+    """
+
+    def test_the_context_reaches_urlopen_and_verifies(self, monkeypatch):
+        import ssl
+        import urllib.request
+
+        seen = {}
+
+        class Resp:
+            status = 200
+            headers = {}
+
+            def read(self, n):
+                return b"<html></html>"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        def urlopen(req, timeout, context=None):
+            seen["context"] = context
+            seen["url"] = req.full_url
+            return Resp()
+
+        monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+        _urllib_fetch("omiss-mcp/tls-test")("https://www.omiss.net/Facelift/index.php")
+
+        context = seen["context"]
+        assert context is not None, "the fetch opened a connection with no context"
+        assert context.verify_mode == ssl.CERT_REQUIRED
+        assert context.check_hostname is True
+        assert context.get_ca_certs(), "the context carries no roots to verify against"
+        assert seen["url"].startswith("https://")

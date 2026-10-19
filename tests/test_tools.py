@@ -79,7 +79,8 @@ def test_schedule():
 
 def test_member_lookup():
     r = valid(call("omiss_member_lookup", {"callsign": "w1oms"}), "member_lookup")
-    assert [m["callsign"] for m in r["members"]] == ["W1OMS"]  # not W1OMSX, which the site also matched
+    # not W1OMSX, which the site also matched
+    assert [m["callsign"] for m in r["members"]] == ["W1OMS"]
     r = valid(call("omiss_member_lookup", {"om_number": 999}), "member_lookup")
     assert r["found"] and r["members"][0]["om_number"] == 999
     r = valid(call("omiss_member_lookup", {"callsign": "K9ZZZ"}), "member_lookup")
@@ -89,7 +90,9 @@ def test_member_lookup():
 
 
 def test_history_and_net():
-    r = valid(call("omiss_checkin_history", {"callsign": "W1OMS", "band": "20m", "date": "2026-09"}), "checkin_history")
+    r = valid(call("omiss_checkin_history",
+                   {"callsign": "W1OMS", "band": "20m", "date": "2026-09"}),
+              "checkin_history")
     assert r["filters"] == {"callsign": "W1OMS", "band": "20m", "date": "2026-09"}
     net_id = r["nets"][0]["net_id"]
     n = valid(call("omiss_net_checkins", {"net_id": net_id}), "net_checkins")
@@ -109,9 +112,12 @@ def test_statehood_officers_awards():
     valid(call("omiss_award_rules"), "award_rules")
     r = valid(call("omiss_award_rules", {"award_id": "100gold"}), "award_rules")
     assert r["award_id"] == "100GOLD" and r["rules_url"].endswith("awardRules.php#100GOLD")
-    r = valid(call("omiss_award_recipients", {"award_id": "alphabetsoup", "limit": 2}), "award_recipients")
+    r = valid(call("omiss_award_recipients", {"award_id": "alphabetsoup", "limit": 2}),
+              "award_recipients")
     assert r["total"] == 3 and r["returned"] == 2 and r["recipients"][0]["certificate"] == "3"
-    r = valid(call("omiss_award_recipients", {"award_id": "ALPHABETSOUP", "om_number": 999}), "award_recipients")
+    r = valid(call("omiss_award_recipients",
+                   {"award_id": "ALPHABETSOUP", "om_number": 999}),
+              "award_recipients")
     assert [x["callsign"] for x in r["recipients"]] == ["W1OMS"]
     fails("omiss_award_recipients", {"award_id": "NOPE"})
 
@@ -132,7 +138,8 @@ def test_nets_on_air_needs_a_callsign_once():
     assert "omiss_set_callsign" in message
     assert "Ask the user" in message
     fails("omiss_set_callsign", {"callsign": "not a call"})
-    assert call("omiss_set_callsign", {"callsign": "ki7mt"}) == {"callsign": "KI7MT", "saved": True}
+    assert call("omiss_set_callsign", {"callsign": "ki7mt"}) == {"callsign": "KI7MT",
+                                                                 "saved": True}
     r = call("omiss_nets_on_air")
     nets = {n["name"]: n for n in r["nets"]}
     assert set(nets) == {"OMISS 20m SSB Net", "Sideband Saturday", "OMISS Informal Net"}
@@ -147,7 +154,9 @@ def test_nets_on_air_needs_a_callsign_once():
 
 
 def test_eligibility():
-    r = valid(call("omiss_eligibility", {"callsigns": ["w1oms", "W2XBB", "W3XCC", "KX0AA", "N0NE", "W1OMS"]}),
+    r = valid(call("omiss_eligibility",
+                   {"callsigns": ["w1oms", "W2XBB", "W3XCC", "KX0AA", "N0NE",
+                                  "W1OMS"]}),
               "eligibility")
     by = {c["callsign"]: c for c in r["callsigns"]}
     assert list(by) == ["W1OMS", "W2XBB", "W3XCC", "KX0AA", "N0NE"]  # in order, once each
@@ -183,7 +192,9 @@ def test_failures_are_flagged_and_successes_still_carry_as_of():
 
 
 def test_help_and_version_exit_without_serving(capsys, monkeypatch):
-    for arg, expect in (("--help", "usage: omiss-mcp"), ("-h", "usage: omiss-mcp"), ("--version", "omiss-mcp ")):
+    for arg, expect in (("--help", "usage: omiss-mcp"),
+                        ("-h", "usage: omiss-mcp"),
+                        ("--version", "omiss-mcp ")):
         monkeypatch.setattr("sys.argv", ["omiss-mcp", arg])
         server.main()  # returns instead of serving
         assert expect in capsys.readouterr().out

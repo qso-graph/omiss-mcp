@@ -31,7 +31,8 @@ mcp = FastMCP(
         "OMISS (Old Man International Sideband Society): the net schedule and holidays, "
         "OMISS nets on the air now, member lookup by callsign or OM number, past nets and "
         "who checked in, the 40m Statehood schedule, officers, awards and their rules and "
-        "recipients, net statistics, and award eligibility for a list of callsigns. Read-only, from omiss.net's public pages, which "
+        "recipients, net statistics, and award eligibility for a list of callsigns. "
+        "Read-only, from omiss.net's public pages, which "
         "are read slowly and cached (see age_seconds). Past nets come from "
         "omiss_checkin_history, which gives the net_id omiss_net_checkins needs; award IDs "
         "come from omiss_awards. omiss_nets_on_air asks NetLogger, which needs the user's "
@@ -70,7 +71,8 @@ def _mock_fetch(url: str) -> tuple[int, bytes, str | None]:
     query = urllib.parse.parse_qs(parts.query)
     name = _SAMPLES[page]
     # The samples hold one member and one net; anything else isn't found.
-    if page == "searchResults.php" and query.get("searchText", [""])[0] not in ("W1OMS", "999"):
+    searching = query.get("searchText", [""])[0]
+    if page == "searchResults.php" and searching not in ("W1OMS", "999"):
         name = "searchResults_none.html"
     if page == "displayCheckinHistory.php" and query.get("id", [""])[0] != "30001":
         name = "displayCheckinHistory_none.html"
@@ -81,7 +83,8 @@ def _mock_netlogger_fetch(url: str) -> tuple[int, bytes, str | None]:
     # omiss-mcp's own NetLogger sample, so mock mode doesn't depend on what
     # netlogger-mcp happens to bundle (its samples changed in 0.1.6).
     routine = urllib.parse.urlparse(url).path.rsplit("/", 1)[-1].removesuffix(".php")
-    return 200, files("omiss_mcp.samples").joinpath(f"netlogger_{routine}.xml").read_bytes(), None
+    sample = files("omiss_mcp.samples").joinpath(f"netlogger_{routine}.xml")
+    return 200, sample.read_bytes(), None
 
 
 _source: OmissSource | None = None
@@ -179,7 +182,8 @@ def get_version_info() -> dict[str, Any]:
     the records it returns.
 
     Returns:
-        service_name, service_version (PyPI), spec_version (omiss.net layout), contract_version.
+        service_name, service_version (PyPI), spec_version (omiss.net layout),
+        contract_version.
     """
     return _version_info_payload()
 
@@ -224,9 +228,11 @@ def omiss_nets_on_air() -> dict[str, Any]:
             if callsign is None:
                 raise ToolError(NEEDS_CALLSIGN_MESSAGE)
             if _mock():
-                _netlogger = NetLoggerSource(callsign, "omiss-mcp", __version__,
-                                             fetch=_mock_netlogger_fetch,
-                                             limiter=RateLimiter(NETLOGGER_LIMITS), cache=Cache())
+                _netlogger = NetLoggerSource(
+                    callsign, "omiss-mcp", __version__,
+                    fetch=_mock_netlogger_fetch,
+                    limiter=RateLimiter(NETLOGGER_LIMITS), cache=Cache(),
+                )
             else:
                 _netlogger = NetLoggerSource(callsign, "omiss-mcp", __version__)
         live = _netlogger.active_nets(name_like="")
@@ -245,7 +251,8 @@ def omiss_nets_on_air() -> dict[str, Any]:
             if "OMISS" in names:
                 by.append("name")
             if by:
-                nets.append({**net, "matched_by": by, **({"omiss_net": scheduled} if scheduled else {})})
+                nets.append({**net, "matched_by": by,
+                             **({"omiss_net": scheduled} if scheduled else {})})
         result = {"as_of_utc": _as_of(), **live, "total": len(nets), "nets": nets}
         if note:
             result["note"] = note
@@ -285,7 +292,9 @@ def omiss_set_callsign(callsign: str) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_READS_OMISS)
-def omiss_member_lookup(callsign: str | None = "", om_number: int | None = None) -> dict[str, Any]:
+def omiss_member_lookup(
+    callsign: str | None = "", om_number: int | None = None,
+) -> dict[str, Any]:
     """Look up one OMISS member by callsign or by OM number (give one).
 
     Args:
@@ -323,7 +332,8 @@ def omiss_checkin_history(
         matches (the site's total), showing, and nets with net_id, name, time (UTC)
         and check-in count. Use net_id with omiss_net_checkins.
     """
-    return _run("checkin_history", callsign or None, om_number, band or None, date or None, net_control or None)
+    return _run("checkin_history", callsign or None, om_number, band or None,
+                date or None, net_control or None)
 
 
 @mcp.tool(annotations=_READS_OMISS)
@@ -428,7 +438,8 @@ def omiss_award_recipients(
         total, and recipients with certificate, callsign, OM number, date issued,
         band info, endorsements and notes.
     """
-    return _run("award_recipients", award_id, callsign or None, om_number, limit if limit is not None else 100)
+    return _run("award_recipients", award_id, callsign or None, om_number,
+                limit if limit is not None else 100)
 
 
 @mcp.tool(annotations=_READS_OMISS)

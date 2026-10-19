@@ -18,19 +18,23 @@ def test_net_schedule():
     s = pages.net_schedule(sample("index.html"))
     first = s["nets"][0]
     assert first == {
-        "band": "10m", "time_utc": "18:00", "frequency_mhz": "28.525", "frequency_window": "28.500-28.695",
+        "band": "10m", "time_utc": "18:00", "frequency_mhz": "28.525",
+        "frequency_window": "28.500-28.695",
         "window_low_mhz": "28.500", "window_high_mhz": "28.695",
-        "weekdays_utc": ["Sat", "Sun"], "seasonal_utc": [{"weekdays": ["Wed"], "months": [4, 5, 6]}],
+        "weekdays_utc": ["Sat", "Sun"],
+        "seasonal_utc": [{"weekdays": ["Wed"], "months": [4, 5, 6]}],
         "days": ["Sat & Sun", "Wed: April-June"], "footnotes": [1],
         "coordinator": {"callsign": "W1XAA", "name": "ALICE", "om_number": 1001},
     }
     twelve = s["nets"][1]
     assert twelve["holiday_time_utc"] == "16:30"
-    assert twelve["days"] == ["Sat, Sun", "Wed: July-September"]  # a footnote mark with no space
+    # a footnote mark with no space
+    assert twelve["days"] == ["Sat, Sun", "Wed: July-September"]
     assert s["nets"][3]["footnotes"] == [1, 2, 3]
     assert "footnotes" not in s["nets"][2]  # "Daily", no marks
     assert set(s["footnotes"]) == {"1", "2", "3"}
-    assert s["notes"] == ["Days and times are in UTC. Nets that are Friday night local are displayed as Sat UTC."]
+    assert s["notes"] == ["Days and times are in UTC. Nets that are Friday night "
+                          "local are displayed as Sat UTC."]
     assert s["holidays"][1] == {
         "date": "2026-02-16", "name": "Washington's Birthday (observed)",
         "note": "Washington's Birthday is also Presidents Day (observed)",
@@ -43,7 +47,8 @@ def test_members_and_no_match():
     assert found[0]["first_responder"] == ["Firefighter"]
     # The roster prints US Eastern time: EDT (UTC-4) in September, EST (UTC-5) in March.
     assert found[0]["last_checkin"] == "2026-09-26T23:30:02Z"
-    assert found[1]["silent_key"] is True and found[1]["last_checkin"] == "2019-03-07T07:05:00Z"
+    assert found[1]["silent_key"] is True
+    assert found[1]["last_checkin"] == "2019-03-07T07:05:00Z"
     assert pages.members(sample("searchResults_none.html")) == []
 
 
@@ -87,17 +92,21 @@ def test_officers():
     ]
     assert by["Charter Members"]["text"] == ["OM #01-110"]
     assert by["Past Presidents"]["people"][0] == {
-        "term": "1982-1983", "callsign": "K1XFF", "name": "FRANK", "om_number": 16, "silent_key": True}
+        "term": "1982-1983", "callsign": "K1XFF", "name": "FRANK", "om_number": 16,
+        "silent_key": True}
     assert by["OM Of The Year"]["people"][1] == {"year": 1996, "vacant": True}
-    assert by["OM Of The Year"]["people"][2] == {"year": 2015, "callsign": "K7XII", "name": "IVY", "om_number": 1007}
+    assert by["OM Of The Year"]["people"][2] == {
+        "year": 2015, "callsign": "K7XII", "name": "IVY", "om_number": 1007}
 
 
 def test_awards_and_rules():
-    assert [a["award_id"] for a in pages.awards(sample("awardRecipients.html"))] == ["100GOLD", "ALPHABETSOUP", "5x325"]
+    assert [a["award_id"] for a in pages.awards(sample("awardRecipients.html"))] == [
+        "100GOLD", "ALPHABETSOUP", "5x325"]
     r = pages.award_rules(sample("awardRules.html"))
     gold = r["awards"][0]
     assert gold["award_id"] == "100GOLD" and gold["summary"].startswith("Work 100 OM members")
-    assert gold["rules"]["Contacts Start Date"] == "You may use contacts starting from January 1, 2004."
+    assert gold["rules"]["Contacts Start Date"] == (
+        "You may use contacts starting from January 1, 2004.")
     assert "Application and Submission" not in gold["rules"]  # printed with a postal address
     assert gold["how_to_apply"]
     assert "how_to_apply" not in r["awards"][1]
@@ -108,18 +117,23 @@ def test_award_recipients():
     assert r["name"] == "Alphabet Soup"
     assert r["recipients"][0] == {"certificate": "1", "callsign": "K1XFF", "om_number": 16,
                                   "issued": "2006-07-20", "silent_key": True}
-    assert r["recipients"][2]["issued"] == "2026-08-01" and r["recipients"][2]["notes"] == "Electronic"
+    assert r["recipients"][2]["issued"] == "2026-08-01"
+    assert r["recipients"][2]["notes"] == "Electronic"
 
 
 def test_statistics():
     s = pages.net_statistics(sample("statistics.html"))
     assert s["nets_total"] == 1000 and s["nets_per_band"]["40m Late"] == 100
     assert s["last_net_per_band"]["80m Late"] == "2026-04-05T05:45:12Z"
-    assert s["leaderboards"]["king_of_the_hill_total_checkins_current_month"]["entries"][0] == {
+    kings = s["leaderboards"]["king_of_the_hill_total_checkins_current_month"]
+    assert kings["entries"][0] == {
         "rank": 1, "callsign": "W1OMS", "count": 42}
-    assert s["leaderboards"]["ncs_total_nets_last_90_days"]["entries"][1]["callsign"] == "W4XDD"
-    assert s["last_checkin_by_state"]["CT"]["160m"] == {"callsign": "W1OMS", "time": "2026-09-10T19:30:02Z"}
-    assert s["last_checkin_by_state"]["PA"] == {"10m": {"callsign": "W3XCC", "time": "2026-08-16T18:44:20Z"}}
+    assert (s["leaderboards"]["ncs_total_nets_last_90_days"]["entries"][1]["callsign"]
+            == "W4XDD")
+    assert s["last_checkin_by_state"]["CT"]["160m"] == {
+        "callsign": "W1OMS", "time": "2026-09-10T19:30:02Z"}
+    assert s["last_checkin_by_state"]["PA"] == {
+        "10m": {"callsign": "W3XCC", "time": "2026-08-16T18:44:20Z"}}
 
 
 @pytest.mark.parametrize("parser", [
@@ -143,23 +157,29 @@ def test_schedule_days_and_windows_are_structured():
     assert b["10m"]["weekdays_utc"] == ["Sat", "Sun"]
     assert b["10m"]["seasonal_utc"] == [{"weekdays": ["Wed"], "months": [4, 5, 6]}]
     assert b["12m"]["weekdays_utc"] == ["Sat", "Sun"]  # "Sat, Sun"
-    assert b["20m"]["weekdays_utc"] == ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]  # "Daily"
+    # "Daily"
+    assert b["20m"]["weekdays_utc"] == ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
+                                        "Sun"]
     assert b["160m"]["weekdays_utc"] == ["Mon", "Sat", "Sun"]  # "Sat & Sun & Mon"
     assert (b["10m"]["window_low_mhz"], b["10m"]["window_high_mhz"]) == ("28.500", "28.695")
-    assert (b["12m"]["window_low_mhz"], b["12m"]["window_high_mhz"]) == ("24.973", "24.987")  # +/- 7 kHz
+    # +/- 7 kHz
+    assert (b["12m"]["window_low_mhz"], b["12m"]["window_high_mhz"]) == ("24.973",
+                                                                         "24.987")
     assert (b["160m"]["window_low_mhz"], b["160m"]["window_high_mhz"]) == ("1.920", "1.940")
 
 
 def test_parse_days_refuses_what_it_cant_read():
     assert pages.parse_days(["Sat & Sun"]) == (["Sat", "Sun"], [])
-    assert pages.parse_days(["Wed: October-December"]) == ([], [{"weekdays": ["Wed"], "months": [10, 11, 12]}])
+    assert pages.parse_days(["Wed: October-December"]) == (
+        [], [{"weekdays": ["Wed"], "months": [10, 11, 12]}])
     assert pages.parse_days(["Wed: November-February"])[1][0]["months"] == [11, 12, 1, 2]
     assert pages.parse_days(["Sat & Sun", "second Tuesday"]) is None
     assert pages.parse_days(["Wed: Spring-Fall"]) is None
 
 
 def test_hyphenated_award_ids_are_kept_whole():
-    """WAS-KN4OM read as WAS, colliding with the basic WAS award; Patriot-NCSQTR and PATRIOT-TOPOP read as
+    """WAS-KN4OM read as WAS, colliding with the basic WAS award; Patriot-NCSQTR
+    and PATRIOT-TOPOP read as
     Patriot and PATRIOT, and the case-insensitive de-duplication then dropped one of them."""
     links = sample("awardRecipients.html").replace(
         '<a href="GenAwardReport.php?AwardID=ALPHABETSOUP">Alphabet Soup</a>',
@@ -177,15 +197,18 @@ def test_hyphenated_award_ids_are_kept_whole():
     box = rules[start:end].replace("100GOLD", "WAS-KN4OM")
     r = pages.award_rules(rules[:start] + box + rules[start:])
     kn4om = r["awards"][0]
-    assert kn4om["award_id"] == "WAS-KN4OM" and kn4om["rules"]  # the detail div (WAS-KN4OMx) was found
+    # the detail div (WAS-KN4OMx) was found
+    assert kn4om["award_id"] == "WAS-KN4OM" and kn4om["rules"]
 
 
 def test_award_id_naming_two_awards_fails_loudly():
     page = sample("awardRecipients.html").replace(
         '<a href="GenAwardReport.php?AwardID=ALPHABETSOUP">Alphabet Soup</a>',
         '<a href="GenAwardReport.php?AwardID=ALPHABETSOUP">Alphabet Soup</a>'
-        '<a href="GenAwardReport.php?AwardID=ALPHABETSOUP">Alphabet Soup</a>'  # the same award twice: kept once
-        '<a href="GenAwardReport.php?AwardID=alphabetsoup">Something Else</a>')  # a different award: an error
+        # the same award twice: kept once
+        '<a href="GenAwardReport.php?AwardID=ALPHABETSOUP">Alphabet Soup</a>'
+        # a different award: an error
+        '<a href="GenAwardReport.php?AwardID=alphabetsoup">Something Else</a>')
     with pytest.raises(pages.PageChanged):
         pages.awards(page)
 
@@ -202,7 +225,8 @@ def test_rosters():
     fr = pages.first_responder_roster(sample("firstResponderRoster.html"))
     assert "NONE" not in fr and len(fr) == 2  # OM 0, an open position, is skipped
     assert fr["W2XBB"]["status"] == "Active"
-    assert pages.state_capital_roster(sample("stateCapitalRoster.html")) == {"W2XBB": {"state": "RI"}}
+    assert pages.state_capital_roster(sample("stateCapitalRoster.html")) == {
+        "W2XBB": {"state": "RI"}}
     assert pages.silent_key_roster(sample("SKRoster.html")) == {"KX0AA"}
 
 

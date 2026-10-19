@@ -9,6 +9,29 @@ payload carried an `error` key. Anything reading `result["error"]` should read t
 `needs_callsign: true` and a `next_step`. It is now a flagged error whose message is the whole of
 that instruction — it still names `omiss_set_callsign` and still says exactly what to do.
 
+### Lint (#36, qso-graph-devel#70)
+
+- **`E501` is adopted.** It reported **112 lines** — the most of any repo in this sweep — and
+  **not one of them was a defect**, which is the finding rather than an argument against
+  enforcing it. A consistent width is worth having; it just was never the thing holding the
+  quality, which is why the rules that do find defects (`F`, `I`, mypy strict) went in first.
+- **No line is exempt, and that was not the expectation.** The deferral note predicted that
+  publisher-field lines would need a `noqa`. In this repo none did: omiss.net's own strings — its
+  `GenAwardReport.php?AwardID=` links, its `<h3>` section titles (`King of the Hill`,
+  `NCS Total Nets`), its form field names (`Band`, `NCS`, `OMNum`, `Call`, …) and its table
+  headers (`Net Time & Frequency`, `40m Net Date`, `Certificate Number`) — all survive a reflow
+  **whole**, because the break goes at a concatenation boundary or a list comma rather than
+  through the literal. There is no `# noqa: E501` anywhere in the repo, and a check confirms it.
+- **Nothing moved on the wire.** Every tool's description and `inputSchema` was dumped through a
+  real client before and after: byte-identical. `--help` likewise, same SHA-256. (netlogger-mcp's
+  pass did change two parameter descriptions, because an `Args:` line was reflowed there; no
+  `Args:` line needed reflowing here.)
+- One reflow of mine produced `a or b if c else d`, which parses as `(a or b) if c else d` —
+  correct, but only to a reader who knows the precedence. It is spelled out as an `if`/`else`
+  instead, which is shorter as well as plainer.
+- Ruff's own `I001` fired once on `test_source.py` after the previous commit's import; fixed with
+  `--fix` rather than by hand.
+
 ### TLS (#35, qso-graph-devel#73)
 
 - **`certifi` is carried, and the fetch verifies against it.** The one `urlopen` in `omiss.py`

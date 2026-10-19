@@ -169,7 +169,8 @@ def user_agent(program_id: str | None = None, program_version: str | None = None
 # winter schedule runs but not exactly what it changes, so these nets get no
 # next time rather than a guess.
 WINTER_FOOTNOTES = {2, 3}
-HOLIDAY_FOOTNOTE = 1  # "And Monday if it is a Legal Holiday, plus ..." (the holiday table's dates)
+# "And Monday if it is a Legal Holiday, plus ..." (the holiday table's dates)
+HOLIDAY_FOOTNOTE = 1
 LOOKAHEAD_DAYS = 15
 
 
@@ -208,9 +209,14 @@ def next_run(net: dict[str, Any], holidays: set[str], now: datetime) -> dict[str
             name in s["weekdays"] and day.month in s["months"] for s in seasonal)
         if not (holiday or regular):
             continue
-        when = at(day, net.get("holiday_time_utc") or net["time_utc"]) if holiday else at(day, net["time_utc"])
+        if holiday:
+            time_utc = net.get("holiday_time_utc") or net["time_utc"]
+        else:
+            time_utc = net["time_utc"]
+        when = at(day, time_utc)
         if when > start:
-            return {"next_utc": when.strftime("%Y-%m-%dT%H:%M:%SZ"), "next_is_holiday": holiday}
+            return {"next_utc": when.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "next_is_holiday": holiday}
     return {"next_utc_note": f"doesn't run in the next {LOOKAHEAD_DAYS} days"}
 
 
@@ -251,7 +257,9 @@ def _in_window(net: dict[str, Any], mhz: float | None, band_: str | None) -> boo
     return band_.lower() == sched_band
 
 
-def match_schedule(live: dict[str, Any], schedule: list[dict[str, Any]]) -> dict[str, Any] | None:
+def match_schedule(
+    live: dict[str, Any], schedule: list[dict[str, Any]],
+) -> dict[str, Any] | None:
     """The scheduled OMISS net a live NetLogger net is, or None.
 
     It matches when its frequency is inside the net's published window (or, without a
@@ -275,12 +283,14 @@ def match_schedule(live: dict[str, Any], schedule: list[dict[str, Any]]) -> dict
             h, m = (int(x) for x in (net.get("time_utc") or "").split(":"))
         except ValueError:
             continue
-        for day in (when.date() - timedelta(days=1), when.date(), when.date() + timedelta(days=1)):
+        for day in (when.date() - timedelta(days=1), when.date(),
+                    when.date() + timedelta(days=1)):
             if not _runs_on(net, day):
                 continue
             start = datetime(day.year, day.month, day.day, h, m, tzinfo=timezone.utc)
             minutes = (when - start).total_seconds() / 60
-            if -OPENS_EARLY_MIN <= minutes <= OPENS_LATE_MIN and (best is None or abs(minutes) < best[0]):
+            if (-OPENS_EARLY_MIN <= minutes <= OPENS_LATE_MIN
+                    and (best is None or abs(minutes) < best[0])):
                 best = (abs(minutes), net)
     if best is None:
         return None
@@ -391,13 +401,19 @@ class OmissSource:
             self._sleep(wait)
             waited += wait
 
-    def _page(self, kind: str, path: str, params: dict[str, str], build: Callable[[str], Any]) -> tuple[Any, dict[str, Any]]:
+    def _page(
+        self, kind: str, path: str, params: dict[str, str],
+        build: Callable[[str], Any],
+    ) -> tuple[Any, dict[str, Any]]:
         """Fetch a page (or use the cache); the value and its freshness, with the
         time of the answer (as_of_utc)."""
         value, info = self._fetch_page(kind, path, params, build)
         return value, {"as_of_utc": self._now().strftime("%Y-%m-%dT%H:%M:%SZ"), **info}
 
-    def _fetch_page(self, kind: str, path: str, params: dict[str, str], build: Callable[[str], Any]) -> tuple[Any, dict[str, Any]]:
+    def _fetch_page(
+        self, kind: str, path: str, params: dict[str, str],
+        build: Callable[[str], Any],
+    ) -> tuple[Any, dict[str, Any]]:
         """Fetch a page, parse it with ``build``, cache the result."""
         key = kind + ":" + path + "?" + urllib.parse.urlencode(sorted(params.items()))
         hit = self._cache.get(key)
@@ -414,7 +430,8 @@ class OmissSource:
                 return self._stale_or_raise(hit, RateLimited(wait))
             if wait > 0:
                 return self._stale_or_raise(hit, OmissError(
-                    f"other requests from this computer are ahead in line; try again in {max(1, round(wait))} s"))
+                    "other requests from this computer are ahead in line; "
+                    f"try again in {max(1, round(wait))} s"))
 
             url = BASE + path + ("?" + urllib.parse.urlencode(params) if params else "")
             try:
@@ -427,11 +444,13 @@ class OmissSource:
                 self._limiter.block_all(_retry_after(retry_after))
                 return self._stale_or_raise(hit, RateLimited(_retry_after(retry_after)))
             if status >= 500:
-                return self._stale_or_raise(hit, OmissError(f"omiss.net answered HTTP {status}"))
+                return self._stale_or_raise(
+                    hit, OmissError(f"omiss.net answered HTTP {status}"))
             if status == 404:
                 return self._stale_or_raise(hit, PageChanged(path))
             if status != 200:
-                return self._stale_or_raise(hit, OmissError(f"omiss.net answered HTTP {status}"))
+                return self._stale_or_raise(
+                    hit, OmissError(f"omiss.net answered HTTP {status}"))
             if len(body) > MAX_BODY:
                 return self._stale_or_raise(hit, OmissError("omiss.net's page was too large"))
 
@@ -443,10 +462,13 @@ class OmissSource:
             return value, {"cached": False, "age_seconds": 0, "stale": False}
 
     @staticmethod
-    def _stale_or_raise(hit: tuple[Any, float, bool] | None, error: OmissError) -> tuple[Any, dict[str, Any]]:
+    def _stale_or_raise(
+        hit: tuple[Any, float, bool] | None, error: OmissError,
+    ) -> tuple[Any, dict[str, Any]]:
         if hit is None:
             raise error
-        return hit[0], {"cached": True, "age_seconds": round(hit[1]), "stale": True, "note": str(error)}
+        return hit[0], {"cached": True, "age_seconds": round(hit[1]), "stale": True,
+                        "note": str(error)}
 
     # ------------------------------------------------------------------
     # Lookups
@@ -461,7 +483,9 @@ class OmissSource:
         nets = [dict(n, **season(n), **next_run(n, holidays, now)) for n in value["nets"]]
         return {"source": SOURCE, **value, "nets": nets, **info}
 
-    def member_lookup(self, callsign: str | None = None, om_number_: str | int | None = None) -> dict[str, Any]:
+    def member_lookup(
+        self, callsign: str | None = None, om_number_: str | int | None = None,
+    ) -> dict[str, Any]:
         """One member, by callsign or OM number (not both)."""
         if bool(callsign) == bool(om_number_):
             raise OmissError("give either callsign or om_number")
@@ -477,7 +501,8 @@ class OmissSource:
             found = [m for m in found if m.get("callsign") == call]
         else:
             found = [m for m in found if m.get("om_number") == num]
-        result: dict[str, Any] = {"source": SOURCE, "found": bool(found), "members": found, **info}
+        result: dict[str, Any] = {"source": SOURCE, "found": bool(found),
+                                  "members": found, **info}
         if not found:
             result["message"] = "no OMISS member matches"
         return result
@@ -504,16 +529,19 @@ class OmissSource:
             "Max": "",
             "Submit": "Search",
         }
-        value, info = self._page("history", "listCheckinHistory.php", params, pages.checkin_history)
+        value, info = self._page("history", "listCheckinHistory.php", params,
+                                 pages.checkin_history)
         filters = {k: v for k, v in (
-            ("callsign", params["Call"]), ("om_number", params["OMNum"]), ("band", params["Band"]),
+            ("callsign", params["Call"]), ("om_number", params["OMNum"]),
+            ("band", params["Band"]),
             ("date", params["Date"]), ("net_control", params["NCS"])) if v}
         return {"source": SOURCE, "filters": filters, **value, **info}
 
     def net_checkins(self, net_id_: str | int) -> dict[str, Any]:
         """One past net: net control, relays, notes, and the check-in list."""
         nid = net_id(net_id_)
-        value, info = self._page("net", "displayCheckinHistory.php", {"id": str(nid)}, pages.net_checkins)
+        value, info = self._page("net", "displayCheckinHistory.php", {"id": str(nid)},
+                                 pages.net_checkins)
         if value is None:
             return {"source": SOURCE, "net_id": nid, "found": False,
                     "message": "no OMISS net has that ID", **info}
@@ -521,14 +549,18 @@ class OmissSource:
 
     def statehood_schedule(self, today: date | None = None) -> dict[str, Any]:
         """The 40m net dates and their free-call states, and the next one."""
-        rows, info = self._page("statehood", "statehoodSchedule.php", {}, pages.statehood_schedule)
+        rows, info = self._page("statehood", "statehoodSchedule.php", {},
+                                pages.statehood_schedule)
         today = today or self._now().date()
         upcoming = [r for r in rows if r["date"] >= today.isoformat()]
-        result = {"source": SOURCE, "next": upcoming[0] if upcoming else None, "schedule": rows, **info}
+        result = {"source": SOURCE, "next": upcoming[0] if upcoming else None,
+                  "schedule": rows, **info}
         if not upcoming:
             last = rows[-1]["date"] if rows else None
-            result["note"] = (f"omiss.net's published Statehood schedule ends on {last}; no later dates "
-                              "are posted yet" if last else "omiss.net has no Statehood dates posted")
+            result["note"] = (
+                f"omiss.net's published Statehood schedule ends on {last}; "
+                "no later dates are posted yet" if last
+                else "omiss.net has no Statehood dates posted")
         return result
 
     def eligibility(self, callsigns: list[str] | str) -> dict[str, Any]:
@@ -548,8 +580,10 @@ class OmissSource:
             raise OmissError(f"at most {MAX_ELIGIBILITY_CALLS} callsigns at a time")
         members, info = self._page("roster", "rosterXML.php", {}, pages.roster_members)
         military, _ = self._page("military", "militaryRoster.php", {}, pages.military_roster)
-        responders, _ = self._page("first_responder", "firstResponderRoster.php", {}, pages.first_responder_roster)
-        capitals, _ = self._page("state_capital", "stateCapitalRoster.php", {}, pages.state_capital_roster)
+        responders, _ = self._page("first_responder", "firstResponderRoster.php", {},
+                                   pages.first_responder_roster)
+        capitals, _ = self._page("state_capital", "stateCapitalRoster.php", {},
+                                 pages.state_capital_roster)
         silent, _ = self._page("silent_keys", "SKRoster.php", {}, pages.silent_key_roster)
         out = []
         for call in calls:
@@ -593,14 +627,18 @@ class OmissSource:
         """One award's rules, or (no award_id) every award's name, ID and summary."""
         value, info = self._page("rules", "awardRules.php", {}, pages.award_rules)
         if not award_id:
-            brief = [{k: a[k] for k in ("award_id", "name", "summary") if k in a} for a in value["awards"]]
-            return {"source": SOURCE, "note": value.get("note"), "total": len(brief), "awards": brief, **info}
+            brief = [{k: a[k] for k in ("award_id", "name", "summary") if k in a}
+                     for a in value["awards"]]
+            return {"source": SOURCE, "note": value.get("note"), "total": len(brief),
+                    "awards": brief, **info}
         wanted = (award_id or "").strip().upper()
         match = [a for a in value["awards"] if a["award_id"].upper() == wanted]
         if not match:
             if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,31}", wanted):
-                raise OmissError("award_id must be an ID from omiss_awards (e.g. ALPHABETSOUP)")
-            raise OmissError(f"no OMISS award has the ID {award_id}; omiss_award_rules with no ID lists them")
+                raise OmissError(
+                    "award_id must be an ID from omiss_awards (e.g. ALPHABETSOUP)")
+            raise OmissError(f"no OMISS award has the ID {award_id}; "
+                             "omiss_award_rules with no ID lists them")
         return {"source": SOURCE, "note": value.get("note"), **match[0],
                 "rules_url": BASE + "awardRules.php#" + match[0]["award_id"], **info}
 
@@ -619,7 +657,8 @@ class OmissSource:
             limit = max(1, min(int(limit), 1000))
         except (TypeError, ValueError):
             raise OmissError("limit must be a whole number") from None
-        value, info = self._page("recipients", "GenAwardReport.php", {"AwardID": aid}, pages.award_recipients)
+        value, info = self._page("recipients", "GenAwardReport.php", {"AwardID": aid},
+                                 pages.award_recipients)
         rows = value["recipients"]
         if call:
             rows = [r for r in rows if r.get("callsign") == call]
@@ -627,7 +666,8 @@ class OmissSource:
             rows = [r for r in rows if r.get("om_number") == num]
         rows = list(reversed(rows))  # the site lists oldest first
         return {"source": SOURCE, "award_id": aid, "name": value.get("name"),
-                "total": len(rows), "returned": min(len(rows), limit), "recipients": rows[:limit], **info}
+                "total": len(rows), "returned": min(len(rows), limit),
+                "recipients": rows[:limit], **info}
 
     def net_statistics(self, state_: str | None = None, top: int = 10) -> dict[str, Any]:
         """Nets per band, last net per band, leaderboards, and (for a state) its
@@ -638,9 +678,11 @@ class OmissSource:
         except (TypeError, ValueError):
             raise OmissError("top must be a whole number") from None
         value, info = self._page("statistics", "statistics.php", {}, pages.net_statistics)
-        out = {k: v for k, v in value.items() if k not in ("leaderboards", "last_checkin_by_state")}
+        out = {k: v for k, v in value.items()
+               if k not in ("leaderboards", "last_checkin_by_state")}
         out["leaderboards"] = {
-            k: {"title": b["title"], "entries": b["entries"][:top]} for k, b in value["leaderboards"].items()
+            k: {"title": b["title"], "entries": b["entries"][:top]}
+            for k, b in value["leaderboards"].items()
         }
         if st:
             out["state"] = st

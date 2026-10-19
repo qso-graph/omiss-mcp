@@ -1,4 +1,8 @@
-"""omiss-mcp: OMISS nets, members, check-in history, Statehood, officers and awards. Read-only."""
+"""omiss-mcp: OMISS nets, members, check-in history, Statehood, officers and awards.
+
+Read-only apart from omiss_set_callsign, which saves the operator's callsign to
+netlogger-mcp's settings file so NetLogger can be told which station is asking.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +14,7 @@ from importlib.resources import files
 from typing import Any
 
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 from netlogger_mcp import settings as netlogger_settings
 from netlogger_mcp.limiter import Cache, RateLimiter
 from netlogger_mcp.netlogger import LIMITS as NETLOGGER_LIMITS
@@ -26,7 +31,8 @@ mcp = FastMCP(
         "OMISS (Old Man International Sideband Society): the net schedule and holidays, "
         "OMISS nets on the air now, member lookup by callsign or OM number, past nets and "
         "who checked in, the 40m Statehood schedule, officers, awards and their rules and "
-        "recipients, net statistics, and award eligibility for a list of callsigns. Read-only, from omiss.net's public pages, which "
+        "recipients, net statistics, and award eligibility for a list of callsigns. "
+        "Read-only, from omiss.net's public pages, which "
         "are read slowly and cached (see age_seconds). Past nets come from "
         "omiss_checkin_history, which gives the net_id omiss_net_checkins needs; award IDs "
         "come from omiss_awards. omiss_nets_on_air asks NetLogger, which needs the user's "
@@ -65,7 +71,8 @@ def _mock_fetch(url: str) -> tuple[int, bytes, str | None]:
     query = urllib.parse.parse_qs(parts.query)
     name = _SAMPLES[page]
     # The samples hold one member and one net; anything else isn't found.
-    if page == "searchResults.php" and query.get("searchText", [""])[0] not in ("W1OMS", "999"):
+    searching = query.get("searchText", [""])[0]
+    if page == "searchResults.php" and searching not in ("W1OMS", "999"):
         name = "searchResults_none.html"
     if page == "displayCheckinHistory.php" and query.get("id", [""])[0] != "30001":
         name = "displayCheckinHistory_none.html"
@@ -76,7 +83,8 @@ def _mock_netlogger_fetch(url: str) -> tuple[int, bytes, str | None]:
     # omiss-mcp's own NetLogger sample, so mock mode doesn't depend on what
     # netlogger-mcp happens to bundle (its samples changed in 0.1.6).
     routine = urllib.parse.urlparse(url).path.rsplit("/", 1)[-1].removesuffix(".php")
-    return 200, files("omiss_mcp.samples").joinpath(f"netlogger_{routine}.xml").read_bytes(), None
+    sample = files("omiss_mcp.samples").joinpath(f"netlogger_{routine}.xml")
+    return 200, sample.read_bytes(), None
 
 
 _source: OmissSource | None = None
@@ -104,17 +112,58 @@ def _run(method: str, *args: Any) -> dict[str, Any]:
         answer: dict[str, Any] = getattr(_get_source(), method)(*args)
         return answer
     except OmissError as e:
-        return {"error": str(e), "as_of_utc": _as_of()}
-    except Exception:
-        return {"error": "omiss-mcp hit an unexpected problem", "as_of_utc": _as_of()}
+        raise ToolError(str(e)) from e
+    except Exception as e:
+        # Deliberately not str(e): this branch catches what was not foreseen, and an
+        # unforeseen exception's text is not known to be safe to show.
+        raise ToolError("omiss-mcp hit an unexpected problem") from e
 
 
-NEEDS_CALLSIGN = {
-    "error": "OMISS nets on the air come from NetLogger, which needs to know which station "
-             "is asking.",
-    "needs_callsign": True,
-    "next_step": "Ask the user for their amateur radio callsign, then call omiss_set_callsign "
-                 "with it. It is asked only once.",
+# Needing a callsign was a *successful* result carrying needs_callsign and next_step,
+# which left the model to notice from the payload that nothing had happened. The
+# specification is explicit that without the flag "the LLM would not be able to see that
+# an error occurred and self-correct". The whole instruction is now the message, so the
+# caller is told it failed and told exactly how to fix it.
+NEEDS_CALLSIGN_MESSAGE = (
+    "OMISS nets on the air come from NetLogger, which needs to know which station is "
+    "asking. Ask the user for their amateur radio callsign, then call omiss_set_callsign "
+    "with it. It is asked only once."
+)
+
+# MCP 2026-07-28 tool annotations. The defaults are pessimistic — a tool that declares
+# nothing is advertised as destructive, non-idempotent and open-world, and the
+# specification tells a client it may keep a human in the loop for an operation like that.
+#
+# Issue #37 says "every tool in this repo is read-only". That is not so, and the hints are
+# set out per group rather than once so a reader cannot come away believing it.
+_READS_OMISS = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    # Reaches omiss.net, or NetLogger, which are outside this host.
+    "openWorldHint": True,
+}
+_ANSWERS_FROM_THE_PACKAGE = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    # Reports versions carried in the wheel. It opens no connection.
+    "openWorldHint": False,
+}
+_SAVES_THE_CALLSIGN = {
+    # The one tool here that writes. It saves the operator's callsign to netlogger-mcp's
+    # settings file, so readOnlyHint is false and saying otherwise would be a plain
+    # untruth about what the tool does.
+    "readOnlyHint": False,
+    # It replaces one value the operator set themselves. The specification reserves
+    # destructive for updates that destroy — this overwrites a single setting with the
+    # caller's own new value, and nothing else is lost.
+    "destructiveHint": False,
+    # Saving the same callsign twice leaves the same state, so a client may safely retry.
+    "idempotentHint": True,
+    # It writes locally and opens no connection; NetLogger is not told anything until the
+    # next lookup.
+    "openWorldHint": False,
 }
 
 
@@ -127,18 +176,19 @@ def _version_info_payload() -> dict[str, Any]:
     }
 
 
-@mcp.tool()
+@mcp.tool(annotations=_ANSWERS_FROM_THE_PACKAGE)
 def get_version_info() -> dict[str, Any]:
     """Get omiss-mcp's version, the omiss.net layout it reads, and the version of
     the records it returns.
 
     Returns:
-        service_name, service_version (PyPI), spec_version (omiss.net layout), contract_version.
+        service_name, service_version (PyPI), spec_version (omiss.net layout),
+        contract_version.
     """
     return _version_info_payload()
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READS_OMISS)
 def omiss_net_schedule() -> dict[str, Any]:
     """Get the OMISS net schedule: every net's band, UTC time, frequency and window,
     days, holiday time and band coordinator, and the next time it runs; the
@@ -156,7 +206,7 @@ def omiss_net_schedule() -> dict[str, Any]:
     return _run("net_schedule")
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READS_OMISS)
 def omiss_nets_on_air() -> dict[str, Any]:
     """List OMISS nets on the air now, from NetLogger, each matched to OMISS's own net
     schedule.
@@ -176,11 +226,13 @@ def omiss_nets_on_air() -> dict[str, Any]:
         if _netlogger is None:
             callsign = netlogger_settings.load_callsign()
             if callsign is None:
-                return {**NEEDS_CALLSIGN, "as_of_utc": _as_of()}
+                raise ToolError(NEEDS_CALLSIGN_MESSAGE)
             if _mock():
-                _netlogger = NetLoggerSource(callsign, "omiss-mcp", __version__,
-                                             fetch=_mock_netlogger_fetch,
-                                             limiter=RateLimiter(NETLOGGER_LIMITS), cache=Cache())
+                _netlogger = NetLoggerSource(
+                    callsign, "omiss-mcp", __version__,
+                    fetch=_mock_netlogger_fetch,
+                    limiter=RateLimiter(NETLOGGER_LIMITS), cache=Cache(),
+                )
             else:
                 _netlogger = NetLoggerSource(callsign, "omiss-mcp", __version__)
         live = _netlogger.active_nets(name_like="")
@@ -199,18 +251,23 @@ def omiss_nets_on_air() -> dict[str, Any]:
             if "OMISS" in names:
                 by.append("name")
             if by:
-                nets.append({**net, "matched_by": by, **({"omiss_net": scheduled} if scheduled else {})})
+                nets.append({**net, "matched_by": by,
+                             **({"omiss_net": scheduled} if scheduled else {})})
         result = {"as_of_utc": _as_of(), **live, "total": len(nets), "nets": nets}
         if note:
             result["note"] = note
         return result
+    except ToolError:
+        # The callsign refusal above is already the right shape; re-flagging it as an
+        # unforeseen problem would discard the instruction the caller needs.
+        raise
     except NetLoggerError as e:
-        return {"error": str(e), "as_of_utc": _as_of()}
-    except Exception:
-        return {"error": "omiss-mcp hit an unexpected problem", "as_of_utc": _as_of()}
+        raise ToolError(str(e)) from e
+    except Exception as e:
+        raise ToolError("omiss-mcp hit an unexpected problem") from e
 
 
-@mcp.tool()
+@mcp.tool(annotations=_SAVES_THE_CALLSIGN)
 def omiss_set_callsign(callsign: str) -> dict[str, Any]:
     """Save the user's amateur radio callsign, for omiss_nets_on_air. Needed once.
 
@@ -227,15 +284,17 @@ def omiss_set_callsign(callsign: str) -> dict[str, Any]:
     try:
         saved = netlogger_settings.save_callsign(callsign)
     except NetLoggerError as e:
-        return {"error": str(e), "as_of_utc": _as_of()}
-    except OSError:
-        return {"error": "the callsign couldn't be saved to the settings file", "as_of_utc": _as_of()}
+        raise ToolError(str(e)) from e
+    except OSError as e:
+        raise ToolError("the callsign couldn't be saved to the settings file") from e
     _netlogger = None
     return {"callsign": saved, "saved": True}
 
 
-@mcp.tool()
-def omiss_member_lookup(callsign: str | None = "", om_number: int | None = None) -> dict[str, Any]:
+@mcp.tool(annotations=_READS_OMISS)
+def omiss_member_lookup(
+    callsign: str | None = "", om_number: int | None = None,
+) -> dict[str, Any]:
     """Look up one OMISS member by callsign or by OM number (give one).
 
     Args:
@@ -250,7 +309,7 @@ def omiss_member_lookup(callsign: str | None = "", om_number: int | None = None)
     return _run("member_lookup", callsign or None, om_number)
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READS_OMISS)
 def omiss_checkin_history(
     callsign: str | None = "",
     om_number: int | None = None,
@@ -273,10 +332,11 @@ def omiss_checkin_history(
         matches (the site's total), showing, and nets with net_id, name, time (UTC)
         and check-in count. Use net_id with omiss_net_checkins.
     """
-    return _run("checkin_history", callsign or None, om_number, band or None, date or None, net_control or None)
+    return _run("checkin_history", callsign or None, om_number, band or None,
+                date or None, net_control or None)
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READS_OMISS)
 def omiss_net_checkins(net_id: int) -> dict[str, Any]:
     """Get one past OMISS net: its net control, relays, frequency, net control's
     notes, and the check-in list.
@@ -291,7 +351,7 @@ def omiss_net_checkins(net_id: int) -> dict[str, Any]:
     return _run("net_checkins", net_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READS_OMISS)
 def omiss_eligibility(callsigns: list[str]) -> dict[str, Any]:
     """For stations on a net: is each an OMISS member, and which award categories
     does it count for? From omiss.net's own rosters.
@@ -312,7 +372,7 @@ def omiss_eligibility(callsigns: list[str]) -> dict[str, Any]:
     return _run("eligibility", callsigns)
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READS_OMISS)
 def omiss_statehood_schedule() -> dict[str, Any]:
     """Get the 40m Statehood schedule: each 40m net date and its free-call states,
     and the next one.
@@ -323,7 +383,7 @@ def omiss_statehood_schedule() -> dict[str, Any]:
     return _run("statehood_schedule")
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READS_OMISS)
 def omiss_officers() -> dict[str, Any]:
     """List OMISS's officers, directors, band coordinators, committees, appointees,
     past presidents and other VIPs.
@@ -334,7 +394,7 @@ def omiss_officers() -> dict[str, Any]:
     return _run("officers")
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READS_OMISS)
 def omiss_awards() -> dict[str, Any]:
     """List the OMISS awards that have recipients, with the award IDs the other
     award tools take.
@@ -345,7 +405,7 @@ def omiss_awards() -> dict[str, Any]:
     return _run("awards")
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READS_OMISS)
 def omiss_award_rules(award_id: str | None = "") -> dict[str, Any]:
     """Get an OMISS award's rules, or (no award_id) every award's name, ID and summary.
 
@@ -359,7 +419,7 @@ def omiss_award_rules(award_id: str | None = "") -> dict[str, Any]:
     return _run("award_rules", award_id or None)
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READS_OMISS)
 def omiss_award_recipients(
     award_id: str,
     callsign: str | None = "",
@@ -378,10 +438,11 @@ def omiss_award_recipients(
         total, and recipients with certificate, callsign, OM number, date issued,
         band info, endorsements and notes.
     """
-    return _run("award_recipients", award_id, callsign or None, om_number, limit if limit is not None else 100)
+    return _run("award_recipients", award_id, callsign or None, om_number,
+                limit if limit is not None else 100)
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READS_OMISS)
 def omiss_net_statistics(state: str | None = "", top: int | None = 10) -> dict[str, Any]:
     """Get OMISS net statistics for the last 52 weeks: nets per band, the last net on
     each band, and the leaderboards (most check-ins, most nets as net control).

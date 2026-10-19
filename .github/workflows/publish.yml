@@ -80,7 +80,17 @@ jobs:
 
       - name: Grep check — no plaintext http://
         run: |
-          if grep -rn 'http://' src/ | grep -v 'localhost\|127\.0\.0\.1\|::1'; then
+          # Tests the output, not the exit status, because the exit status of a
+          # "grep -v" pipeline is not portable: on macOS /usr/bin/grep, "grep -v"
+          # given empty input exits 0, where GNU grep exits 1. The old form
+          # therefore reported FAIL on a *clean* tree for anyone running this
+          # check locally on a Mac — it passed here only because the runner is
+          # ubuntu. A gate that cannot be trusted off the runner is a gate nobody
+          # runs before pushing, which is how it came to be noticed: it failed
+          # during omiss-mcp's 0.2.0 pre-release walk with nothing wrong.
+          hits="$(grep -rn 'http://' src/ | grep -v 'localhost\|127\.0\.0\.1\|::1' || true)"
+          if [ -n "$hits" ]; then
+            echo "$hits"
             echo "FAIL: non-HTTPS URL found in source"
             exit 1
           fi

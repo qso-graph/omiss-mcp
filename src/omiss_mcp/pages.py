@@ -153,7 +153,10 @@ def parse_days(lines: list[str]) -> tuple[list[str], list[dict[str, Any]]] | Non
             days, first, last = _weekdays(m.group(1)), _month(m.group(2)), _month(m.group(3))
             if not days or not first or not last:
                 return None
-            months = list(range(first, last + 1)) if first <= last else list(range(first, 13)) + list(range(1, last + 1))
+            if first <= last:
+                months = list(range(first, last + 1))
+            else:
+                months = list(range(first, 13)) + list(range(1, last + 1))
             seasonal.append({"weekdays": days, "months": months})
             continue
         days = _weekdays(line)
@@ -181,8 +184,11 @@ def frequency_window(center: str, window: str) -> tuple[str, str] | None:
 
 def net_schedule(page: str) -> dict[str, Any]:
     # Footnote marks (<sup>1,2</sup>) become "[fn:1,2]" so they survive as text.
-    content = re.sub(r"<sup>\s*([\d,\s]+?)\s*</sup>", r" [fn:\1]", main_content(page), flags=re.I)
-    rows = find_table(content, ["Band", "Net Time & Frequency", "Day", "Band Coordinator"], "the net schedule")
+    content = re.sub(r"<sup>\s*([\d,\s]+?)\s*</sup>", r" [fn:\1]",
+                     main_content(page), flags=re.I)
+    rows = find_table(content,
+                      ["Band", "Net Time & Frequency", "Day", "Band Coordinator"],
+                      "the net schedule")
     nets = []
     for row in rows:
         if len(row) < 4:
@@ -231,7 +237,8 @@ def net_schedule(page: str) -> dict[str, Any]:
         int(n): text_of(t)
         for n, t in re.findall(r"<p>\s*\[fn:(\d)\](.*?)</p>", content, re.S | re.I)
     }
-    notes = [text_of(t) for t in re.findall(r"<p>\s*<em>\s*<strong>(.*?)</p>", content, re.S | re.I)]
+    notes = [text_of(t) for t in
+             re.findall(r"<p>\s*<em>\s*<strong>(.*?)</p>", content, re.S | re.I)]
 
     holidays = []
     for table in tables(content):
@@ -247,7 +254,8 @@ def net_schedule(page: str) -> dict[str, Any]:
             except ValueError:
                 continue
             note = " ".join(line.strip() for line in lines[1:]).removeprefix("Note:").strip()
-            holidays.append(_drop_empty({"date": day, "name": m.group(2).strip(), "note": note}))
+            holidays.append(_drop_empty(
+                {"date": day, "name": m.group(2).strip(), "note": note}))
 
     return {
         "nets": nets,
@@ -271,7 +279,8 @@ def members(page: str) -> list[dict[str, Any]]:
     for row in rows:
         if len(row) < len(_MEMBER_HEADER):
             continue  # "No data matched your search"
-        om, call, first, status, grid, state, county, env, military, first_resp, last = row[:11]
+        (om, call, first, status, grid, state, county, env, military, first_resp,
+         last) = row[:11]
         om_number = _int(om)
         if om_number is None:
             continue
@@ -299,7 +308,8 @@ def members(page: str) -> list[dict[str, Any]]:
 # listCheckinHistory.php: past nets
 # ---------------------------------------------------------------------------
 
-_HISTORY_COUNT_RE = re.compile(r"Search returned (\d+) match(?:es)?(?: \(showing last (\d+)\))?", re.I)
+_HISTORY_COUNT_RE = re.compile(
+    r"Search returned (\d+) match(?:es)?(?: \(showing last (\d+)\))?", re.I)
 _HISTORY_NET_RE = re.compile(
     r'<input type="radio" name="id" value="(\d+)"\s*/?>\s*(.*?)\s+--\s+'
     r"(\d{4}-\d{1,2}-\d{1,2} \d{1,2}:\d{2}:\d{2})\s*UTC\s*<i>\((\d+) Check-?ins?\)</i>",
@@ -415,7 +425,8 @@ def net_checkins(page: str) -> dict[str, Any] | None:
 
 
 def statehood_schedule(page: str) -> list[dict[str, Any]]:
-    rows = find_table(main_content(page), ["40m Net Date", "Free Call States"], "the Statehood schedule")
+    rows = find_table(main_content(page), ["40m Net Date", "Free Call States"],
+                      "the Statehood schedule")
     out = []
     for row in rows:
         if len(row) < 2:
@@ -445,7 +456,8 @@ _VIP_RE = re.compile(
 def officers(page: str) -> list[dict[str, Any]]:
     content = main_content(page)
     sections = []
-    for title, body in re.findall(r"<h3>([^<]*)</h3>\s*<pre>(.*?)</pre>", content, re.S | re.I):
+    for title, body in re.findall(r"<h3>([^<]*)</h3>\s*<pre>(.*?)</pre>",
+                                  content, re.S | re.I):
         title = text_of(title).rstrip(":").strip()
         people, pending_role, other = [], None, []
         for raw in _html.unescape(body).split("\n"):
@@ -460,14 +472,16 @@ def officers(page: str) -> list[dict[str, Any]]:
                     sk, note = True, ""
                 role = m.group("role").strip() or pending_role
                 pending_role = None
-                person = {"callsign": call, "name": m.group("name").strip(), "om_number": int(m.group("om"))}
+                person = {"callsign": call, "name": m.group("name").strip(),
+                          "om_number": int(m.group("om"))}
                 if role and re.fullmatch(r"\d{4}-\d{4}", role):
                     person = {"term": role} | person
                 elif role and re.fullmatch(r"\d{4}", role):
                     person = {"year": int(role)} | person
                 elif role:
                     person = {"role": role} | person
-                people.append(_drop_empty(person | {"silent_key": True if sk else None, "note": clean(note)}))
+                people.append(_drop_empty(person | {"silent_key": True if sk else None,
+                                                    "note": clean(note)}))
             elif "OPEN POSITION" in line.upper():
                 when = re.match(r"^(\d{4})(?:-(\d{4}))?\s", line)
                 vacant: dict[str, Any] = {"role": pending_role, "vacant": True}
@@ -477,7 +491,8 @@ def officers(page: str) -> list[dict[str, Any]]:
                     vacant = {"year": int(when.group(1)), "vacant": True}
                 people.append(_drop_empty(vacant))
                 pending_role = None
-            elif "#" not in line and not re.search(r"\d", line.split()[0] if line.split() else ""):
+            elif ("#" not in line
+                  and not re.search(r"\d", line.split()[0] if line.split() else "")):
                 pending_role = clean(line)  # a role heading; the person is on the next line
             else:
                 other.append(clean(line))
@@ -493,10 +508,13 @@ def officers(page: str) -> list[dict[str, Any]]:
 # Awards
 # ---------------------------------------------------------------------------
 
-# Award IDs are letters and digits, and a few have hyphens (WAS-KN4OM, MIL-1ST-RESP, PATRIOT-TOPOP,
+# Award IDs are letters and digits, and a few have hyphens (WAS-KN4OM,
+# MIL-1ST-RESP, PATRIOT-TOPOP,
 # Patriot-NCSQTR); cutting at the hyphen made WAS-KN4OM read as WAS.
 _AWARD_ID = r"[A-Za-z0-9][A-Za-z0-9-]*"
-_AWARD_LINK_RE = re.compile(r'<a href="GenAwardReport\.php\?AwardID=(' + _AWARD_ID + r')"\s*>(.*?)</a>', re.I)
+_AWARD_LINK_RE = re.compile(
+    r'<a href="GenAwardReport\.php\?AwardID=(' + _AWARD_ID + r')"\s*>(.*?)</a>',
+    re.I)
 
 
 def awards(page: str) -> list[dict[str, str]]:
@@ -507,7 +525,8 @@ def awards(page: str) -> list[dict[str, str]]:
         if award_id.upper() in seen:
             if seen[award_id.upper()] == name:
                 continue  # the same award linked twice
-            # Two different awards behind one ID: never drop one silently (WAS-KN4OM once read as WAS).
+            # Two different awards behind one ID: never drop one silently
+            # (WAS-KN4OM once read as WAS).
             raise PageChanged(f"the award list (ID {award_id} names two awards)")
         seen[award_id.upper()] = name
         out.append({"award_id": award_id, "name": name})
@@ -525,12 +544,16 @@ def award_rules(page: str) -> dict[str, Any]:
     note = re.search(r"<h3>\s*<center>(.*?)</center>\s*</h3>", content, re.S | re.I)
     rules = []
     for box in content.split('<div class="sidebarbox">')[1:]:
-        h = re.search(r"<h3>(.*?)(?:<a [^>]*AwardID=(" + _AWARD_ID + r")[^>]*>.*?</a>)?\s*</h3>", box, re.S | re.I)
+        h = re.search(
+            r"<h3>(.*?)(?:<a [^>]*AwardID=(" + _AWARD_ID + r")[^>]*>.*?</a>)?\s*</h3>",
+            box, re.S | re.I)
         if not h or not h.group(2):
             continue
         award_id = h.group(2)
         summary = re.search(r"<p>(.*?)</p>", box, re.S | re.I)
-        detail = re.search(r'<div[^>]*id="' + re.escape(award_id) + r'x"[^>]*>(.*?)</div>', box, re.S | re.I)
+        detail = re.search(
+            r'<div[^>]*id="' + re.escape(award_id) + r'x"[^>]*>(.*?)</div>',
+            box, re.S | re.I)
         fields: dict[str, str] = {}
         last = None
         for line in text_of(detail.group(1)).split("\n") if detail else []:
@@ -546,7 +569,8 @@ def award_rules(page: str) -> dict[str, Any]:
         rules.append(_drop_empty({
             "award_id": award_id,
             "name": text_of(h.group(1)),
-            "summary": text_of(summary.group(1)).replace("(more...)", "").strip() if summary else None,
+            "summary": (text_of(summary.group(1)).replace("(more...)", "").strip()
+                        if summary else None),
             "rules": fields,
             "how_to_apply": "See the award's rules on omiss.net" if dropped else None,
         }))
@@ -569,7 +593,8 @@ def _short_date(value: str) -> str | None:
         return None
 
 
-_RECIPIENT_HEADER = ["Certificate Number", "Current Callsign", "OM #", "Date Issued", "Band Info",
+_RECIPIENT_HEADER = ["Certificate Number", "Current Callsign", "OM #",
+                     "Date Issued", "Band Info",
                      "Endorsements", "Notes"]
 
 
@@ -632,16 +657,21 @@ def net_statistics(page: str) -> dict[str, Any]:
             for band, cell in zip(bands, row[1:]):
                 parts = cell.split("\n")
                 if len(parts) >= 3:
-                    entry[band] = {"callsign": parts[0].strip().upper(), "time": utc_time(f"{parts[1]} {parts[2]}")}
+                    entry[band] = {"callsign": parts[0].strip().upper(),
+                                   "time": utc_time(f"{parts[1]} {parts[2]}")}
             by_state[row[0].strip()] = entry
 
     boards = {}
-    for title, body in re.findall(r"<h3>((?:King of the Hill|NCS Total Nets)[^<]*)</h3>(.*?</table>)", content, re.S | re.I):
+    for title, body in re.findall(
+            r"<h3>((?:King of the Hill|NCS Total Nets)[^<]*)</h3>(.*?</table>)",
+            content, re.S | re.I):
         entries = []
         for t in tables(body):
             for row in t:
                 if len(row) >= 3 and _int(row[2]) is not None:
-                    entries.append({"rank": _int(row[0].rstrip(".")), "callsign": row[1].upper(), "count": _int(row[2])})
+                    entries.append({"rank": _int(row[0].rstrip(".")),
+                                    "callsign": row[1].upper(),
+                                    "count": _int(row[2])})
         key = re.sub(r"[^a-z0-9]+", "_", one_line(title).casefold()).strip("_")
         boards[key] = {"title": one_line(title), "entries": entries}
 
@@ -651,7 +681,8 @@ def net_statistics(page: str) -> dict[str, Any]:
         "period_end": utc_time(newest.group(1)) if newest else None,
         "nets_total": _int(values[0]) if values else None,
         "nets_per_band": {b: _int(v) for b, v in zip(labels, values[1:])},
-        "last_net_per_band": {b: utc_time(v) for b, v in zip(last[0], last[1][1:]) if utc_time(v)},
+        "last_net_per_band": {b: utc_time(v) for b, v in zip(last[0], last[1][1:])
+                              if utc_time(v)},
         "leaderboards": boards,
         "last_checkin_by_state": by_state,
     }
@@ -705,7 +736,8 @@ def roster_members(page: str) -> dict[str, dict[str, Any]]:
 
 def military_roster(page: str) -> dict[str, list[dict[str, Any]]]:
     """militaryRoster.php: service by callsign (a member may list several)."""
-    rows = find_table(main_content(page), ["OM #", "Call", "Name", "Branch", "Dates", "Award Code"],
+    rows = find_table(main_content(page),
+                      ["OM #", "Call", "Name", "Branch", "Dates", "Award Code"],
                       "the military roster")
     out: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
@@ -715,7 +747,8 @@ def military_roster(page: str) -> dict[str, list[dict[str, Any]]]:
         if not call or _int(row[0]) in (None, 0):
             continue
         out.setdefault(call, []).append(_drop_empty({
-            "branch": one_line(row[3]), "dates": one_line(row[4]), "award_code": one_line(row[5])}))
+            "branch": one_line(row[3]), "dates": one_line(row[4]),
+            "award_code": one_line(row[5])}))
     return out
 
 
@@ -740,7 +773,8 @@ def first_responder_roster(page: str) -> dict[str, dict[str, Any]]:
 
 def state_capital_roster(page: str) -> dict[str, dict[str, Any]]:
     """stateCapitalRoster.php: members whose station is inside a state capital."""
-    rows = find_table(main_content(page), ["OM #", "Call", "Name", "State"], "the State Capital roster")
+    rows = find_table(main_content(page), ["OM #", "Call", "Name", "State"],
+                      "the State Capital roster")
     out: dict[str, dict[str, Any]] = {}
     for row in rows:
         if len(row) < 4:

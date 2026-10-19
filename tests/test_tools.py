@@ -14,6 +14,7 @@ from importlib.resources import files  # noqa: E402
 import jsonschema  # noqa: E402
 import pytest  # noqa: E402
 from fastmcp import Client  # noqa: E402
+from fastmcp.exceptions import ToolError  # noqa: E402
 
 from omiss_mcp import server  # noqa: E402
 
@@ -43,6 +44,17 @@ def call(name: str, args: dict | None = None) -> dict:
     return asyncio.run(go())
 
 
+def fails(name: str, args: dict | None = None) -> str:
+    """The message a client sees, having asserted the call came back flagged.
+
+    These go through a real fastmcp.Client, so a raised ToolError here is the client
+    seeing isError: true — not an exception leaking out of a direct function call.
+    """
+    with pytest.raises(ToolError) as caught:
+        call(name, args)
+    return str(caught.value)
+
+
 def valid(result: dict, record: str) -> dict:
     assert "error" not in result, result
     jsonschema.validate(result, {"$ref": f"#/$defs/{record}", "$defs": SCHEMA["$defs"]})
@@ -67,26 +79,29 @@ def test_schedule():
 
 def test_member_lookup():
     r = valid(call("omiss_member_lookup", {"callsign": "w1oms"}), "member_lookup")
-    assert [m["callsign"] for m in r["members"]] == ["W1OMS"]  # not W1OMSX, which the site also matched
+    # not W1OMSX, which the site also matched
+    assert [m["callsign"] for m in r["members"]] == ["W1OMS"]
     r = valid(call("omiss_member_lookup", {"om_number": 999}), "member_lookup")
     assert r["found"] and r["members"][0]["om_number"] == 999
     r = valid(call("omiss_member_lookup", {"callsign": "K9ZZZ"}), "member_lookup")
     assert r["found"] is False
-    assert "error" in call("omiss_member_lookup", {})
-    assert "error" in call("omiss_member_lookup", {"callsign": "W1OMS", "om_number": 999})
+    fails("omiss_member_lookup", {})
+    fails("omiss_member_lookup", {"callsign": "W1OMS", "om_number": 999})
 
 
 def test_history_and_net():
-    r = valid(call("omiss_checkin_history", {"callsign": "W1OMS", "band": "20m", "date": "2026-09"}), "checkin_history")
+    r = valid(call("omiss_checkin_history",
+                   {"callsign": "W1OMS", "band": "20m", "date": "2026-09"}),
+              "checkin_history")
     assert r["filters"] == {"callsign": "W1OMS", "band": "20m", "date": "2026-09"}
     net_id = r["nets"][0]["net_id"]
     n = valid(call("omiss_net_checkins", {"net_id": net_id}), "net_checkins")
     assert n["found"] and n["checkin_count"] == 3
     n = valid(call("omiss_net_checkins", {"net_id": 5}), "net_checkins")
     assert n["found"] is False
-    assert "error" in call("omiss_checkin_history", {"band": "6m"})
-    assert "real date" in call("omiss_checkin_history", {"date": "2026-13"})["error"]
-    assert "YYYY" in call("omiss_checkin_history", {"date": "Sept 2026"})["error"]
+    fails("omiss_checkin_history", {"band": "6m"})
+    assert "real date" in fails("omiss_checkin_history", {"date": "2026-13"})
+    assert "YYYY" in fails("omiss_checkin_history", {"date": "Sept 2026"})
 
 
 def test_statehood_officers_awards():
@@ -97,11 +112,14 @@ def test_statehood_officers_awards():
     valid(call("omiss_award_rules"), "award_rules")
     r = valid(call("omiss_award_rules", {"award_id": "100gold"}), "award_rules")
     assert r["award_id"] == "100GOLD" and r["rules_url"].endswith("awardRules.php#100GOLD")
-    r = valid(call("omiss_award_recipients", {"award_id": "alphabetsoup", "limit": 2}), "award_recipients")
+    r = valid(call("omiss_award_recipients", {"award_id": "alphabetsoup", "limit": 2}),
+              "award_recipients")
     assert r["total"] == 3 and r["returned"] == 2 and r["recipients"][0]["certificate"] == "3"
-    r = valid(call("omiss_award_recipients", {"award_id": "ALPHABETSOUP", "om_number": 999}), "award_recipients")
+    r = valid(call("omiss_award_recipients",
+                   {"award_id": "ALPHABETSOUP", "om_number": 999}),
+              "award_recipients")
     assert [x["callsign"] for x in r["recipients"]] == ["W1OMS"]
-    assert "error" in call("omiss_award_recipients", {"award_id": "NOPE"})
+    fails("omiss_award_recipients", {"award_id": "NOPE"})
 
 
 def test_statistics():
@@ -113,10 +131,15 @@ def test_statistics():
 
 
 def test_nets_on_air_needs_a_callsign_once():
-    r = call("omiss_nets_on_air")
-    assert r["needs_callsign"] is True
-    assert "error" in call("omiss_set_callsign", {"callsign": "not a call"})
-    assert call("omiss_set_callsign", {"callsign": "ki7mt"}) == {"callsign": "KI7MT", "saved": True}
+    # The refusal is flagged, and the whole instruction survives in the message —
+    # dropping the structured needs_callsign/next_step fields is only acceptable while
+    # the text still names the tool that fixes it.
+    message = fails("omiss_nets_on_air")
+    assert "omiss_set_callsign" in message
+    assert "Ask the user" in message
+    fails("omiss_set_callsign", {"callsign": "not a call"})
+    assert call("omiss_set_callsign", {"callsign": "ki7mt"}) == {"callsign": "KI7MT",
+                                                                 "saved": True}
     r = call("omiss_nets_on_air")
     nets = {n["name"]: n for n in r["nets"]}
     assert set(nets) == {"OMISS 20m SSB Net", "Sideband Saturday", "OMISS Informal Net"}
@@ -131,7 +154,9 @@ def test_nets_on_air_needs_a_callsign_once():
 
 
 def test_eligibility():
-    r = valid(call("omiss_eligibility", {"callsigns": ["w1oms", "W2XBB", "W3XCC", "KX0AA", "N0NE", "W1OMS"]}),
+    r = valid(call("omiss_eligibility",
+                   {"callsigns": ["w1oms", "W2XBB", "W3XCC", "KX0AA", "N0NE",
+                                  "W1OMS"]}),
               "eligibility")
     by = {c["callsign"]: c for c in r["callsigns"]}
     assert list(by) == ["W1OMS", "W2XBB", "W3XCC", "KX0AA", "N0NE"]  # in order, once each
@@ -144,20 +169,32 @@ def test_eligibility():
     assert by["KX0AA"]["silent_key"] is True
     assert by["N0NE"] == {"callsign": "N0NE", "member": False}
     for bad in ([], ["not a call"], ["W1OMS"] * 0 + [f"W{i}AA" for i in range(201)]):
-        assert "error" in call("omiss_eligibility", {"callsigns": bad})
+        fails("omiss_eligibility", {"callsigns": bad})
     out = json.dumps(r)
     assert "FN31" not in out and "HARTFORD" not in out  # grid and county are not returned
 
 
 
-def test_errors_carry_as_of():
-    for r in (call("omiss_member_lookup", {}), call("omiss_checkin_history", {"band": "6m"}),
-              call("omiss_nets_on_air")):
-        assert "error" in r and r["as_of_utc"].endswith("Z")
+def test_failures_are_flagged_and_successes_still_carry_as_of():
+    """as_of_utc was on the error payloads too; it is not lost from the answers.
+
+    The old test asserted errors carried as_of_utc. Errors are no longer payloads, so
+    that premise is gone — but the half worth keeping is that a *successful* answer
+    still says when it was true, which it gets from the source layer rather than from
+    the error branches that were removed.
+    """
+    for name, args in (("omiss_member_lookup", {}),
+                       ("omiss_checkin_history", {"band": "6m"}),
+                       ("omiss_nets_on_air", None)):
+        fails(name, args)
+    for name in ("omiss_net_schedule", "omiss_officers", "omiss_awards"):
+        assert call(name)["as_of_utc"].endswith("Z")
 
 
 def test_help_and_version_exit_without_serving(capsys, monkeypatch):
-    for arg, expect in (("--help", "usage: omiss-mcp"), ("-h", "usage: omiss-mcp"), ("--version", "omiss-mcp ")):
+    for arg, expect in (("--help", "usage: omiss-mcp"),
+                        ("-h", "usage: omiss-mcp"),
+                        ("--version", "omiss-mcp ")):
         monkeypatch.setattr("sys.argv", ["omiss-mcp", arg])
         server.main()  # returns instead of serving
         assert expect in capsys.readouterr().out

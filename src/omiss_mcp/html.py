@@ -162,5 +162,9 @@ def find_table(page: str, header: list[str], page_name: str) -> list[list[str]]:
 
 def main_content(page: str) -> str:
     """The page's main content area (between its template markers), or the page."""
-    m = re.search(r'InstanceBeginEditable name="MainContent" -->(.*?)<!-- InstanceEndEditable', page, re.S)
+    m = re.search(
+        r'InstanceBeginEditable name="MainContent" -->'
+        r'(.*?)<!-- InstanceEndEditable',
+        page, re.S,
+    )
     return m.group(1) if m else page

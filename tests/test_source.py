@@ -49,7 +49,8 @@ def setup():
     clock, site = Clock(), Site()
     limiter = RateLimiter(LIMITS, window=SPACING, clock=clock)
     cache = Cache(clock=clock)
-    return clock, site, OmissSource(fetch=site, limiter=limiter, cache=cache, sleep=clock.sleep)
+    return clock, site, OmissSource(fetch=site, limiter=limiter, cache=cache,
+                                    sleep=clock.sleep)
 
 
 def test_requests_are_spaced(setup):
@@ -138,7 +139,8 @@ from omiss_mcp.omiss import next_run  # noqa: E402
 
 def _schedule_at(now: datetime) -> dict:
     body = files("omiss_mcp.samples").joinpath("index.html").read_bytes()
-    source = OmissSource(fetch=lambda url: (200, body, None), limiter=RateLimiter(LIMITS, window=0.0),
+    source = OmissSource(fetch=lambda url: (200, body, None),
+                         limiter=RateLimiter(LIMITS, window=0.0),
                          now=lambda: now)
     r = source.net_schedule()
     return r | {"by_band": {n["band"]: n for n in r["nets"]}}
@@ -152,7 +154,8 @@ def test_every_response_has_as_of():
 def test_next_utc_on_a_monday_evening():
     # Monday 23:19 UTC: the daily 20m net ran at 18:30; the weekend nets are Saturday.
     b = _schedule_at(datetime(2026, 9, 28, 23, 19, tzinfo=timezone.utc))["by_band"]
-    assert b["20m"]["next_utc"] == "2026-09-29T18:30:00Z" and b["20m"]["next_is_holiday"] is False
+    assert b["20m"]["next_utc"] == "2026-09-29T18:30:00Z"
+    assert b["20m"]["next_is_holiday"] is False
     assert b["10m"]["next_utc"] == "2026-10-03T18:00:00Z"
     assert b["12m"]["next_utc"] == "2026-09-30T20:30:00Z"  # Wednesdays July-September
     assert "next_utc" not in b["80m Late"] and "winter" in b["80m Late"]["next_utc_note"]
@@ -163,9 +166,11 @@ def test_next_utc_on_a_holiday():
     # Christmas 2026 is a Friday and on the page's holiday list. Nets citing
     # footnote 1 run that day, at their holiday time if they have one.
     b = _schedule_at(datetime(2026, 12, 24, 22, 0, tzinfo=timezone.utc))["by_band"]
-    assert b["10m"]["next_utc"] == "2026-12-25T18:00:00Z" and b["10m"]["next_is_holiday"] is True
+    assert b["10m"]["next_utc"] == "2026-12-25T18:00:00Z"
+    assert b["10m"]["next_is_holiday"] is True
     assert b["12m"]["next_utc"] == "2026-12-25T16:30:00Z"  # its holiday time
-    assert b["20m"]["next_utc"] == "2026-12-25T18:30:00Z" and b["20m"]["next_is_holiday"] is False
+    assert b["20m"]["next_utc"] == "2026-12-25T18:30:00Z"
+    assert b["20m"]["next_is_holiday"] is False
 
 
 def test_a_net_already_started_today_is_next_tomorrow():
@@ -193,7 +198,8 @@ from datetime import date  # noqa: E402
 from omiss_mcp.omiss import match_schedule  # noqa: E402
 
 SCHEDULE = [
-    {"band": "20m", "time_utc": "18:30", "frequency_mhz": "14.290", "weekdays_utc": ["Mon", "Tue", "Wed", "Thu",
+    {"band": "20m", "time_utc": "18:30", "frequency_mhz": "14.290",
+     "weekdays_utc": ["Mon", "Tue", "Wed", "Thu",
      "Fri", "Sat", "Sun"], "window_low_mhz": "14.240", "window_high_mhz": "14.345"},
     {"band": "80m Late", "time_utc": "05:00", "frequency_mhz": "3.950", "weekdays_utc": [],
      "seasonal_utc": [{"weekdays": ["Sun"], "months": [10, 11, 12, 1, 2, 3]}]},
@@ -222,7 +228,8 @@ def test_a_net_opened_before_midnight_matches_the_next_days_slot():
     # Saturday 23:30 UTC is far too early for Sunday's 05:00.
     assert match_schedule(live(3.950, "2026-10-03T23:30:00Z", "80m"), SCHEDULE) is None
     # Sunday 04:58 UTC, in October: the seasonal 80m Late net.
-    assert match_schedule(live(3.950, "2026-10-04T04:58:00Z", "80m"), SCHEDULE)["band"] == "80m Late"
+    matched = match_schedule(live(3.950, "2026-10-04T04:58:00Z", "80m"), SCHEDULE)
+    assert matched["band"] == "80m Late"
     # The same net in July is out of season.
     assert match_schedule(live(3.950, "2026-07-05T04:58:00Z", "80m"), SCHEDULE) is None
 
@@ -234,12 +241,14 @@ def test_without_a_frequency_the_band_decides():
 
 def test_unreadable_times_do_not_match():
     assert match_schedule(live(14.290, "yesterday"), SCHEDULE) is None
-    assert match_schedule(live(None, "2026-10-03T18:30:00Z"), SCHEDULE) is None  # no frequency, no band
+    # no frequency, no band
+    assert match_schedule(live(None, "2026-10-03T18:30:00Z"), SCHEDULE) is None
 
 
 def _source_with(sample: str) -> OmissSource:
     body = files("omiss_mcp.samples").joinpath(sample).read_bytes()
-    return OmissSource(fetch=lambda url: (200, body, None), limiter=RateLimiter(LIMITS, window=0.0))
+    return OmissSource(fetch=lambda url: (200, body, None),
+                       limiter=RateLimiter(LIMITS, window=0.0))
 
 
 def test_statehood_says_when_the_schedule_has_ended():

@@ -52,7 +52,8 @@ def test_all_urls_https():
     """Guarantee #7: HTTPS only for external calls. Every file under src/, as the
     release gate checks it (the bundled sample pages included)."""
     http_url = re.compile(r'http://(?!localhost|127\.0\.0\.1|::1)')
-    for py_file in (p for p in SRC_DIR.rglob("*") if p.is_file() and "__pycache__" not in p.parts):
+    for py_file in (p for p in SRC_DIR.rglob("*")
+                    if p.is_file() and "__pycache__" not in p.parts):
         content = py_file.read_text(encoding="utf-8", errors="replace")
         matches = http_url.findall(content)
         assert not matches, f"Non-HTTPS URL in {py_file.name}: {matches}"
@@ -116,7 +117,8 @@ SAMPLES = {
 # Parameters each page may be sent, and nothing else.
 ALLOWED_PARAMS = {
     "searchResults.php": {"criteria", "searchText", "scope"},
-    "listCheckinHistory.php": {"Band", "NCS", "OMNum", "Call", "State", "County", "Grid", "Date", "Max", "Submit"},
+    "listCheckinHistory.php": {"Band", "NCS", "OMNum", "Call", "State", "County",
+                               "Grid", "Date", "Max", "Submit"},
     "displayCheckinHistory.php": {"id"},
     "GenAwardReport.php": {"AwardID"},
 }
@@ -186,7 +188,8 @@ def test_every_request_is_https_to_omiss_with_known_params(spy):
     source.net_schedule()
     source.member_lookup(callsign="w1oms")
     source.member_lookup(om_number_="999")
-    source.checkin_history(callsign="W1OMS", om_number_=999, band_="20", date_="2026-09", net_control="W3XCC")
+    source.checkin_history(callsign="W1OMS", om_number_=999, band_="20",
+                           date_="2026-09", net_control="W3XCC")
     source.net_checkins(30001)
     source.statehood_schedule()
     source.officers()
@@ -207,7 +210,8 @@ def test_no_email_or_address_or_sql_returned(spy):
     out = json.dumps([
         source.net_schedule(), source.member_lookup(callsign="W1OMS"),
         source.checkin_history(), source.net_checkins(30001), source.statehood_schedule(),
-        source.officers(), source.awards(), source.award_rules(), source.award_rules("100GOLD"),
+        source.officers(), source.awards(), source.award_rules(),
+        source.award_rules("100GOLD"),
         source.award_recipients("ALPHABETSOUP"), source.net_statistics("CT"),
         source.eligibility(["W1OMS", "W2XBB", "W3XCC", "KX0AA"]),
     ])

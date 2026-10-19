@@ -1,4 +1,5 @@
-"""MCP server for OMISS: net schedule, members, check-in history, Statehood, officers and awards."""
+"""MCP server for OMISS: net schedule, members, check-in history, Statehood,
+officers and awards."""
 
 from __future__ import annotations
 

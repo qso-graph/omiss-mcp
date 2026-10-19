@@ -1,5 +1,53 @@
 # Changelog
 
+## Unreleased
+
+**Upgrading:** a tool that fails now returns `isError: true` instead of a successful result whose
+payload carried an `error` key. Anything reading `result["error"]` should read the error flag.
+
+**The one that will be noticed:** needing a callsign used to be a *successful* result carrying
+`needs_callsign: true` and a `next_step`. It is now a flagged error whose message is the whole of
+that instruction — it still names `omiss_set_callsign` and still says exactly what to do.
+
+### MCP specification 2026-07-28 (#37)
+
+- **Tool errors are flagged `isError`.** Seven error returns in `src/` arrived on the wire as
+  successful results, so a client could not tell "the tool answered" from "the tool refused". The
+  specification says of `CallToolResult.isError` that otherwise "the LLM would not be able to see
+  that an error occurred and self-correct" — we were relying on the model reading the word *error*
+  in prose where the protocol has a flag. They now raise `ToolError`, which FastMCP flags with the
+  message intact.
+- The catch-all branches deliberately do **not** pass `str(e)` through. They exist for what was not
+  foreseen, and an unforeseen exception's text is not known to be safe to show; the branches above
+  them carry the messages that were written to be read.
+- **All 14 tools declare the four annotation hints.** Omitting them is not neutral: the defaults
+  advertise a tool as `destructiveHint: true`, `idempotentHint: false` and `openWorldHint: true`,
+  and the specification tells a client it may keep a human in the loop for an operation like that.
+- **`omiss_set_callsign` is `readOnlyHint: false`.** Issue #37 says "every tool in this repo is
+  read-only" and that is not so — this one writes the operator's callsign, and writes it into
+  **netlogger-mcp's settings file**, which the two servers deliberately share. It is
+  `destructiveHint: false` (it replaces one value the operator set themselves) and
+  `idempotentHint: true` (the same callsign twice leaves the same state), with
+  `openWorldHint: false` because it writes locally and tells NetLogger nothing until the next
+  lookup. The module docstring no longer claims the server is read-only either.
+- `get_version_info` is `openWorldHint: false`; the twelve tools that reach omiss.net or NetLogger
+  are `true`.
+- **A `ToolError` passthrough in `omiss_nets_on_air`, which is a fix and not a declaration.** The
+  callsign refusal is raised from inside a `try` whose `except Exception` turns anything unforeseen
+  into "omiss-mcp hit an unexpected problem". A `ToolError` *is* an `Exception`, so without the
+  passthrough the catch-all would swallow the refusal and replace a precise instruction with a
+  shrug. Two tests hold the line from both sides: the refusal must keep its instruction, and a
+  genuinely unforeseen fault must still arrive as the generic message — so the passthrough cannot
+  be "fixed" by deleting the catch-all it sits in front of.
+- **`tests/test_mcp_conformance.py` asserts all of it**, through a real `fastmcp.Client` where the
+  claim is about the wire. Each check was falsified once — the check removed, the suite watched to
+  fail — eight in all, every one caught, including the two behavioural cases above.
+- The write hints are backed by behaviour rather than trust: the tool really does write, the file
+  it writes is asked of `netlogger_mcp.settings` rather than spelled out here (so the sharing
+  breaking would fail the test rather than quietly pass), and a **refused** callsign leaves no file.
+- `as_of_utc` was on the error payloads as well as the successful ones. It is unchanged for a
+  successful answer, which gets it from the source layer, and a test says so.
+
 ## 0.1.10 (2026-10-11)
 
 - **ruff and mypy run in CI** (qso-graph-devel#66), as a job the `ci-all-green` gate requires.

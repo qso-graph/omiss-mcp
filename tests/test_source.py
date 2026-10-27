@@ -84,12 +84,26 @@ def test_429_backs_off_and_serves_stale(setup):
     assert source.officers()["stale"] is False and site.calls == 3
 
 
-def test_503_backs_off_too(setup):
+def test_a_503_with_retry_after_is_a_limit(setup):
+    """A server shedding load deliberately is stating a limit, so it is
+    honoured the same way a 429 is."""
     clock, site, source = setup
     site.status = 503
+    site.retry_after = "90"
     with pytest.raises(RateLimited) as e:
         source.officers()
-    assert e.value.retry_after >= 60
+    assert e.value.retry_after == 90
+
+
+def test_a_bare_503_is_an_outage_not_a_limit(setup):
+    """It used to raise RateLimited, which said "omiss.net asked us to slow
+    down" about a site that had said no such thing -- and held the user off for
+    a minute when it might come back in five seconds."""
+    clock, site, source = setup
+    site.status = 503
+    with pytest.raises(OmissError, match="HTTP 503") as e:
+        source.officers()
+    assert not isinstance(e.value, RateLimited)
 
 
 def test_server_error_without_cache(setup):

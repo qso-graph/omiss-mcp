@@ -5,6 +5,18 @@ All notable changes to `omiss-mcp` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A bare `503` is reported as an outage, not as a rate limit.** Any `503` was
+  treated as omiss.net asking us to slow down, so the error said exactly that
+  about a site that had said no such thing — and it held every request off for a
+  minute when the site might have come back in five seconds. A `503` carrying
+  `Retry-After` is a server shedding load deliberately and is still honoured
+  like a `429`; a bare one now reads as "omiss.net answered HTTP 503" and lets
+  the next request through.
+
 ## [0.3.0] — 2026-10-26
 
 ### Changed

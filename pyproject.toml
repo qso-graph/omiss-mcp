@@ -1,6 +1,6 @@
 [project]
 name = "omiss-mcp"
-version = "0.3.0"
+version = "0.4.0"
 description = "MCP server for OMISS: net schedule, nets on the air, members, check-in history, Statehood, officers and awards"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}

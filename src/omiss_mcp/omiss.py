@@ -17,6 +17,7 @@ ever sent.
 from __future__ import annotations
 
 import logging
+import math
 import re
 import ssl
 import threading
@@ -44,7 +45,7 @@ REPO = "https://github.com/qso-graph/omiss-mcp"
 SPACING = 2.0  # seconds between requests to omiss.net, across every copy
 LIMITS = {"omiss": 1}  # one request per SPACING window
 MAX_SPACING_WAIT = 10.0  # wait this long for our turn; longer means we were told to back off
-MIN_BACKOFF = 60.0  # after a 429 or 503
+MIN_BACKOFF = 60.0  # after a 429, or a 503 that carries Retry-After
 MAX_BACKOFF = 3600.0
 MAX_BODY = 5 * 1024 * 1024
 
@@ -359,6 +360,12 @@ def _retry_after(header: str | None) -> float:
         seconds = float(header) if header else 0.0
     except ValueError:
         seconds = 0.0
+    # "nan" and "inf" parse as floats, and nan defeats the clamp below: every
+    # comparison against it is False, so it would survive into a deadline that
+    # is then never in the future, leaving the backoff off altogether. A header
+    # we cannot make sense of means the floor.
+    if not math.isfinite(seconds):
+        seconds = 0.0
     return min(max(seconds, MIN_BACKOFF), MAX_BACKOFF)
 
 
@@ -440,7 +447,15 @@ class OmissSource:
                 log.warning("omiss.net %s failed: %s", path, e)
                 return self._stale_or_raise(hit, OmissError("omiss.net couldn't be reached"))
 
-            if status in (429, 503):
+            # A 429 is omiss.net stating its limit outright. A 503 is only
+            # that when it carries Retry-After, which is a server shedding load
+            # deliberately -- a bare 503 is an outage, and saying "omiss.net
+            # asked us to slow down" about one is a false account of what
+            # happened. It also held the user off for a minute when the site
+            # might come back in five seconds, where an outage lets them try
+            # again. The fleet contract is in
+            # qso-graph-devel/planning/MCP-SECURITY-FRAMEWORK.md.
+            if status == 429 or (status == 503 and retry_after):
                 self._limiter.block_all(_retry_after(retry_after))
                 return self._stale_or_raise(hit, RateLimited(_retry_after(retry_after)))
             if status >= 500:

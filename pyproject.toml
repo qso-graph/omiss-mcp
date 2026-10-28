@@ -15,7 +15,7 @@ dependencies = [
     # Relying on a sibling's dependency is relying on somebody else's decision to keep
     # it, and that the somebody else is us makes it tempting, not safer
     # (qso-graph-devel#73).
-    "certifi",
+    "certifi>=2026.10.19",
     "tzdata; sys_platform == 'win32'",  # the roster's US Eastern times; Windows has no zone data
 ]
 keywords = [

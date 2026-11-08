@@ -45,7 +45,7 @@ Net control often opens a net in NetLogger for check-ins well before its listed 
 
 Only `omiss_nets_on_air` needs it: it asks NetLogger, which is told which station is asking. On first use the assistant asks for your callsign and saves it. You're asked once. The other tools don't need it.
 
-## Good Neighbour Policy
+## Good Neighbor Policy
 
 omiss.net is a volunteer-run club website, not an API. We read it gently:
 
